@@ -1,4 +1,12 @@
 <resources>
     <string name="app_name">Transfira-now</string>
     <string name="notification_listener_label">Transfira Now - Acesso às notificações</string>
+    <string name="notification_channel_name">Transferências ao vivo</string>
+    <string name="notification_channel_description">Mostra downloads e progresso ao vivo do Transfira-now</string>
+    <string name="notification_idle_title">Transfira-now ativo</string>
+    <string name="notification_idle_text">Aguardando transferências</string>
+    <string name="notification_source_app_managed">Download do app</string>
+    <string name="notification_progress_pending">Preparando</string>
+    <string name="notification_detail_app_managed">Jornada iniciada pelo próprio app</string>
+    <string name="notification_detail_external">Detectado via notificações</string>
 </resources>

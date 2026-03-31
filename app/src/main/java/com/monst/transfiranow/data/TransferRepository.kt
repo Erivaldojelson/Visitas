@@ -1,7 +1,6 @@
 package com.monst.transfiranow.data
 
 import android.app.Notification
-import android.content.ComponentName
 import android.content.Context
 import android.provider.Settings
 import androidx.compose.ui.graphics.Color
@@ -24,6 +23,14 @@ object TransferRepository {
 
     fun setDynamicColorEnabled(enabled: Boolean) {
         _uiState.update { it.copy(dynamicColorEnabled = enabled) }
+    }
+
+    fun setDownloadUrl(value: String) {
+        _uiState.update { it.copy(downloadUrl = value) }
+    }
+
+    fun setHelperMessage(value: String) {
+        _uiState.update { it.copy(helperMessage = value) }
     }
 
     fun refreshPermissionState(context: Context) {
@@ -53,7 +60,11 @@ object TransferRepository {
     fun topActiveEntry(): TransferEntry? {
         return entries.values
             .filter { it.state == TransferState.Active || it.state == TransferState.Waiting }
-            .maxByOrNull { it.updatedAt }
+            .sortedWith(
+                compareByDescending<TransferEntry> { it.origin == TransferOrigin.AppManaged }
+                    .thenByDescending { it.updatedAt }
+            )
+            .firstOrNull()
     }
 
     fun maybeCaptureNotification(
@@ -87,7 +98,9 @@ object TransferRepository {
                 sourceApp = appName,
                 title = title.ifBlank { text.ifBlank { "Transferência em andamento" } },
                 progress = normalizedProgress,
-                state = if (indeterminate) TransferState.Waiting else TransferState.Active
+                state = if (indeterminate) TransferState.Waiting else TransferState.Active,
+                origin = TransferOrigin.ExternalNotification,
+                detail = "Detectado pelas notificações de outro app."
             )
         )
     }

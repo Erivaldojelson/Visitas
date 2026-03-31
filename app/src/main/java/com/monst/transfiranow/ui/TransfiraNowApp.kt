@@ -26,8 +26,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -37,6 +39,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -57,6 +60,7 @@ import androidx.compose.foundation.Image
 import com.monst.transfiranow.R
 import com.monst.transfiranow.data.AccentOption
 import com.monst.transfiranow.data.TransferEntry
+import com.monst.transfiranow.data.TransferOrigin
 import com.monst.transfiranow.data.TransferRepository
 import com.monst.transfiranow.data.TransferState
 import com.monst.transfiranow.data.formatBytes
@@ -67,7 +71,8 @@ import com.monst.transfiranow.ui.theme.TransfiraNowTheme
 
 @Composable
 fun TransfiraNowApp(
-    onEnsureMonitor: () -> Unit
+    onEnsureMonitor: () -> Unit,
+    onStartDownload: (String) -> Unit
 ) {
     val context = LocalContext.current
     val uiState by TransferRepository.uiState.collectAsState()
@@ -104,6 +109,14 @@ fun TransfiraNowApp(
                     )
                 }
                 item {
+                    DownloadLauncherCard(
+                        url = uiState.downloadUrl,
+                        helperMessage = uiState.helperMessage,
+                        onUrlChange = TransferRepository::setDownloadUrl,
+                        onStartDownload = onStartDownload
+                    )
+                }
+                item {
                     SettingsCard(
                         selectedColor = uiState.accentColor,
                         dynamicColorEnabled = uiState.dynamicColorEnabled,
@@ -113,17 +126,92 @@ fun TransfiraNowApp(
                 }
                 item {
                     Text(
-                        text = "Transferências",
+                        text = "Downloads do app",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
-                if (uiState.entries.isEmpty()) {
+                if (uiState.appManagedEntries.isEmpty()) {
                     item { EmptyCard() }
                 } else {
-                    items(uiState.entries, key = { it.id }) { entry ->
+                    items(uiState.appManagedEntries, key = { it.id }) { entry ->
                         TransferRow(entry)
                     }
+                }
+                item {
+                    Text(
+                        text = "Detectados de terceiros",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+                if (uiState.externalEntries.isEmpty()) {
+                    item { ExternalFallbackCard() }
+                } else {
+                    items(uiState.externalEntries, key = { it.id }) { entry ->
+                        TransferRow(entry)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DownloadLauncherCard(
+    url: String,
+    helperMessage: String,
+    onUrlChange: (String) -> Unit,
+    onStartDownload: (String) -> Unit
+) {
+    Card(
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f)
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Rounded.Public, contentDescription = null)
+                Spacer(Modifier.size(10.dp))
+                Column {
+                    Text("Baixar pelo Transfira-now", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Cole um link direto. Esse fluxo é o mais elegível para Android 16 + ProgressStyle e tem mais chance de entrar na Now Bar.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+            OutlinedTextField(
+                value = url,
+                onValueChange = onUrlChange,
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                leadingIcon = { Icon(Icons.Rounded.Link, contentDescription = null) },
+                label = { Text("URL do arquivo") },
+                placeholder = { Text("https://exemplo.com/app.apk") }
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = helperMessage,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Spacer(Modifier.width(12.dp))
+                Button(
+                    onClick = { onStartDownload(url.trim()) },
+                    enabled = url.trim().startsWith("http")
+                ) {
+                    Text("Baixar")
                 }
             }
         }
@@ -346,7 +434,30 @@ private fun EmptyCard() {
         ) {
             Text("Nenhuma transferência detectada", style = MaterialTheme.typography.titleMedium)
             Text(
-                "Assim que um app publicar uma notificação de download, ele aparece aqui e o Transfira Now espelha o progresso.",
+                "Assim que você iniciar um download pelo próprio app, ele aparece aqui com acompanhamento nativo via DownloadManager.",
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+    }
+}
+
+@Composable
+private fun ExternalFallbackCard() {
+    Card(
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text("Modo fallback para outros apps", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Downloads iniciados fora do Transfira-now continuam aparecendo aqui quando houver notificação de progresso. Para esses casos, a entrega confiável é lock screen + notificação contínua.",
                 style = MaterialTheme.typography.bodyMedium
             )
         }
@@ -377,7 +488,14 @@ private fun TransferRow(entry: TransferEntry) {
                     Spacer(Modifier.size(14.dp))
                     Column {
                         Text(entry.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                        Text(entry.sourceApp, style = MaterialTheme.typography.bodySmall)
+                        Text(
+                            text = if (entry.origin == TransferOrigin.AppManaged) {
+                                "Download iniciado pelo app"
+                            } else {
+                                entry.sourceApp
+                            },
+                            style = MaterialTheme.typography.bodySmall
+                        )
                     }
                 }
                 Text(
@@ -410,10 +528,19 @@ private fun TransferRow(entry: TransferEntry) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "${entry.downloadedBytes?.formatBytes() ?: "0 B"} / ${entry.totalBytes?.formatBytes() ?: "?"}",
-                    style = MaterialTheme.typography.bodyMedium
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "${entry.downloadedBytes?.formatBytes() ?: "0 B"} / ${entry.totalBytes?.formatBytes() ?: "?"}",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    entry.detail?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+                Spacer(Modifier.width(12.dp))
                 Text(
                     text = entry.speedBytesPerSecond?.formatSpeed() ?: if (entry.isIndeterminate) "Aguardando progresso" else "${entry.progressPercent}%",
                     style = MaterialTheme.typography.labelMedium,

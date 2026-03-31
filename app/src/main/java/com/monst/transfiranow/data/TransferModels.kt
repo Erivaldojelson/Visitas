@@ -10,12 +10,19 @@ enum class TransferState {
     Waiting
 }
 
+enum class TransferOrigin {
+    AppManaged,
+    ExternalNotification
+}
+
 data class TransferEntry(
     val id: String,
     val sourceApp: String,
     val title: String,
     val progress: Int?,
     val state: TransferState,
+    val origin: TransferOrigin = TransferOrigin.ExternalNotification,
+    val detail: String? = null,
     val downloadedBytes: Long? = null,
     val totalBytes: Long? = null,
     val speedBytesPerSecond: Long? = null,
@@ -37,13 +44,21 @@ data class TransferUiState(
     val entries: List<TransferEntry> = emptyList(),
     val accentColor: Color = Color(0xFF5D56C4),
     val dynamicColorEnabled: Boolean = true,
-    val notificationsAccessGranted: Boolean = false
+    val notificationsAccessGranted: Boolean = false,
+    val downloadUrl: String = "",
+    val helperMessage: String = "Cole um link direto para iniciar um download pelo próprio app."
 ) {
     val activeEntries: List<TransferEntry>
         get() = entries.filter { it.state == TransferState.Active || it.state == TransferState.Waiting }
 
     val totalSpeedBytesPerSecond: Long
         get() = activeEntries.sumOf { it.speedBytesPerSecond ?: 0L }
+
+    val appManagedEntries: List<TransferEntry>
+        get() = entries.filter { it.origin == TransferOrigin.AppManaged }
+
+    val externalEntries: List<TransferEntry>
+        get() = entries.filter { it.origin == TransferOrigin.ExternalNotification }
 }
 
 fun Long.formatSpeed(): String {

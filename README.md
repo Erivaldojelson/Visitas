@@ -4,11 +4,12 @@
 
 ## Versao
 
-- `1.0.0`
+- `2.0.0`
 
 ## O que o app faz
 
 - Monitora downloads detectados nas notificacoes de outros apps via `NotificationListenerService`.
+- Inicia downloads reais pelo proprio app usando `DownloadManager`.
 - Mostra uma tela principal inspirada no visual do Nowbar Meter, com estilo Material You.
 - Exibe itens de transferencia com icone de progresso mais expressivo, barra de progresso e status.
 - Mantem notificacao continua em segundo plano.
@@ -21,6 +22,7 @@
 - A Samsung nao oferece uma API publica confiavel para forcar um layout customizado dentro da Now Bar.
 - O app segue o caminho suportado pelo Android com notificacao de progresso continua e categorizada, mas a renderizacao final na Now Bar depende da One UI.
 - O monitoramento depende de notificacoes publicadas por outros apps. Se um app nao expuser progresso por notificacao, o `Transfira-now` nao consegue inferir o download com a mesma precisao.
+- O fluxo com mais chance real de aparecer na Now Bar e o download iniciado pelo proprio `Transfira-now`. O modo de terceiros continua como fallback confiavel em lock screen + notificacao continua.
 
 ## Tecnologias
 

@@ -10,6 +10,8 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import com.monst.transfiranow.data.AppDownloadManager
+import com.monst.transfiranow.data.TransferRepository
 import com.monst.transfiranow.service.TransferMonitorService
 import com.monst.transfiranow.ui.TransfiraNowApp
 
@@ -32,7 +34,18 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             TransfiraNowApp(
-                onEnsureMonitor = { startMonitorService() }
+                onEnsureMonitor = { startMonitorService() },
+                onStartDownload = { url ->
+                    val result = AppDownloadManager.enqueue(this, url)
+                    result.onSuccess {
+                        startMonitorService()
+                        TransferRepository.setDownloadUrl("")
+                    }.onFailure { error ->
+                        TransferRepository.setHelperMessage(
+                            error.message ?: "Não foi possível iniciar o download."
+                        )
+                    }
+                }
             )
         }
     }
