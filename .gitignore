@@ -1,0 +1,23 @@
+# Gradle / build
+.gradle/
+build/
+**/build/
+
+# Local machine files
+local.properties
+.kotlin/
+.tools/
+build.out.log
+build.err.log
+
+# IDE
+.idea/
+*.iml
+
+# OS
+Thumbs.db
+Desktop.ini
+
+# Signing
+*.jks
+*.keystore
