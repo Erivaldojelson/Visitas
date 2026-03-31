@@ -27,6 +27,11 @@ import kotlin.math.roundToInt
 
 class NotificationHelper(private val context: Context) {
 
+    enum class Mode {
+        GeneralMonitor,
+        AppManagedLive
+    }
+
     companion object {
         const val CHANNEL_ID = "transfer-monitor"
         const val CHANNEL_GROUP_ID = "transfer-monitor-group"
@@ -81,7 +86,8 @@ class NotificationHelper(private val context: Context) {
     fun buildNotification(
         entry: TransferEntry?,
         accentColor: Int,
-        canPromote: Boolean
+        canPromote: Boolean,
+        mode: Mode = Mode.GeneralMonitor
     ): Notification {
         val pendingIntent = PendingIntent.getActivity(
             context,
@@ -105,14 +111,26 @@ class NotificationHelper(private val context: Context) {
 
         if (entry == null) {
             return builder
-                .setContentTitle(context.getString(R.string.notification_idle_title))
-                .setContentText(context.getString(R.string.notification_idle_text))
+                .setContentTitle(
+                    if (mode == Mode.AppManagedLive) {
+                        context.getString(R.string.notification_live_idle_title)
+                    } else {
+                        context.getString(R.string.notification_idle_title)
+                    }
+                )
+                .setContentText(
+                    if (mode == Mode.AppManagedLive) {
+                        context.getString(R.string.notification_live_idle_text)
+                    } else {
+                        context.getString(R.string.notification_idle_text)
+                    }
+                )
                 .build()
         }
 
-        val contentText = buildContentText(entry)
-        val metaText = buildMetaText(entry)
-        val preferLiveUpdate = entry.origin == TransferOrigin.AppManaged &&
+        val contentText = buildContentText(entry, mode)
+        val metaText = buildMetaText(entry, mode)
+        val preferLiveUpdate = (mode == Mode.AppManagedLive || entry.origin == TransferOrigin.AppManaged) &&
             (entry.state == TransferState.Active || entry.state == TransferState.Waiting)
 
         if (preferLiveUpdate && android.os.Build.VERSION.SDK_INT >= 36) {
@@ -121,7 +139,8 @@ class NotificationHelper(private val context: Context) {
                 accentColor = accentColor,
                 pendingIntent = pendingIntent,
                 contentText = contentText,
-                canPromote = canPromote
+                canPromote = canPromote,
+                mode = mode
             )?.let { return it }
         }
 
@@ -142,7 +161,8 @@ class NotificationHelper(private val context: Context) {
         accentColor: Int,
         pendingIntent: PendingIntent,
         contentText: String,
-        canPromote: Boolean
+        canPromote: Boolean,
+        mode: Mode
     ): Notification? {
         return runCatching {
             val styleClass = Class.forName("android.app.Notification\$ProgressStyle")
@@ -172,7 +192,7 @@ class NotificationHelper(private val context: Context) {
             runCatching {
                 Notification.Builder::class.java
                     .getMethod("setShortCriticalText", String::class.java)
-                    .invoke(builder, shortCriticalText(entry))
+                    .invoke(builder, shortCriticalText(entry, mode))
             }
 
             Notification.Builder::class.java
@@ -197,23 +217,35 @@ class NotificationHelper(private val context: Context) {
         return IconCompat.createWithBitmap(bitmap)
     }
 
-    private fun buildContentText(entry: TransferEntry): String {
+    private fun buildContentText(entry: TransferEntry, mode: Mode): String {
         val source = when (entry.origin) {
-            TransferOrigin.AppManaged -> context.getString(R.string.notification_source_app_managed)
+            TransferOrigin.AppManaged -> if (mode == Mode.AppManagedLive) {
+                context.getString(R.string.notification_source_live_download)
+            } else {
+                context.getString(R.string.notification_source_app_managed)
+            }
             TransferOrigin.ExternalNotification -> entry.sourceApp
         }
-        val progress = if (entry.isIndeterminate) {
-            context.getString(R.string.notification_progress_pending)
-        } else {
-            "${entry.progressPercent}%"
+        return when (entry.state) {
+            TransferState.Completed -> "$source · ${context.getString(R.string.notification_state_completed)}"
+            TransferState.Failed -> "$source · ${context.getString(R.string.notification_state_failed)}"
+            else -> {
+                val progress = if (entry.isIndeterminate) {
+                    context.getString(R.string.notification_progress_pending)
+                } else {
+                    "${entry.progressPercent}%"
+                }
+                "$source · $progress"
+            }
         }
-        return "$source · $progress"
     }
 
-    private fun buildMetaText(entry: TransferEntry): String {
+    private fun buildMetaText(entry: TransferEntry, mode: Mode): String {
         return buildString {
             append(
-                if (entry.origin == TransferOrigin.AppManaged) {
+                if (mode == Mode.AppManagedLive) {
+                    context.getString(R.string.notification_detail_live_session)
+                } else if (entry.origin == TransferOrigin.AppManaged) {
                     context.getString(R.string.notification_detail_app_managed)
                 } else {
                     context.getString(R.string.notification_detail_external)
@@ -228,11 +260,17 @@ class NotificationHelper(private val context: Context) {
         }
     }
 
-    private fun shortCriticalText(entry: TransferEntry): String {
-        return if (entry.isIndeterminate) {
-            context.getString(R.string.notification_progress_pending)
-        } else {
-            "${entry.progressPercent}%"
+    private fun shortCriticalText(entry: TransferEntry, mode: Mode): String {
+        return when (entry.state) {
+            TransferState.Completed -> context.getString(R.string.notification_state_completed)
+            TransferState.Failed -> context.getString(R.string.notification_state_failed)
+            else -> if (mode == Mode.AppManagedLive && !entry.isIndeterminate) {
+                "${entry.progressPercent}%"
+            } else if (entry.isIndeterminate) {
+                context.getString(R.string.notification_progress_pending)
+            } else {
+                "${entry.progressPercent}%"
+            }
         }
     }
 }

@@ -33,6 +33,12 @@
             android:foregroundServiceType="dataSync" />
 
         <service
+            android:name=".service.AppDownloadLiveUpdateService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <service
             android:name=".service.DownloadNotificationListenerService"
             android:label="@string/notification_listener_label"
             android:enabled="true"

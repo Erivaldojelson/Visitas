@@ -67,6 +67,15 @@ object TransferRepository {
             .firstOrNull()
     }
 
+    fun topAppManagedActiveEntry(): TransferEntry? {
+        return entries.values
+            .filter {
+                it.origin == TransferOrigin.AppManaged &&
+                    (it.state == TransferState.Active || it.state == TransferState.Waiting)
+            }
+            .maxByOrNull { it.updatedAt }
+    }
+
     fun maybeCaptureNotification(
         id: String,
         appName: String,

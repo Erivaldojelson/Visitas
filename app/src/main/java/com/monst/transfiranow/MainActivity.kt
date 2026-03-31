@@ -12,6 +12,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.monst.transfiranow.data.AppDownloadManager
 import com.monst.transfiranow.data.TransferRepository
+import com.monst.transfiranow.service.AppDownloadLiveUpdateService
 import com.monst.transfiranow.service.TransferMonitorService
 import com.monst.transfiranow.ui.TransfiraNowApp
 
@@ -39,6 +40,7 @@ class MainActivity : ComponentActivity() {
                     val result = AppDownloadManager.enqueue(this, url)
                     result.onSuccess {
                         startMonitorService()
+                        startAppLiveUpdateService()
                         TransferRepository.setDownloadUrl("")
                     }.onFailure { error ->
                         TransferRepository.setHelperMessage(
@@ -60,6 +62,13 @@ class MainActivity : ComponentActivity() {
         ContextCompat.startForegroundService(
             this,
             Intent(this, TransferMonitorService::class.java)
+        )
+    }
+
+    private fun startAppLiveUpdateService() {
+        ContextCompat.startForegroundService(
+            this,
+            Intent(this, AppDownloadLiveUpdateService::class.java)
         )
     }
 }

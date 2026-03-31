@@ -61,7 +61,8 @@ class TransferMonitorService : Service() {
         return notificationHelper.buildNotification(
             entry = top,
             accentColor = colorInt,
-            canPromote = canRequestPromotedOngoing()
+            canPromote = canRequestPromotedOngoing(),
+            mode = NotificationHelper.Mode.GeneralMonitor
         )
     }
 
