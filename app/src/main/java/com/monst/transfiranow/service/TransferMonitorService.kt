@@ -6,10 +6,8 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
-import android.graphics.BitmapFactory
 import android.os.Build
 import android.os.IBinder
-import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import androidx.core.content.getSystemService
 import com.monst.transfiranow.MainActivity
@@ -83,11 +81,10 @@ class TransferMonitorService : Service() {
             .setOnlyAlertOnce(true)
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
             .setColor(colorInt)
-            .setColorized(true)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
-            .setLargeIcon(BitmapFactory.decodeResource(resources, R.drawable.logo_foreground))
+            .setSubText("Transfira-now")
 
         if (top == null) {
             return builder
@@ -105,9 +102,8 @@ class TransferMonitorService : Service() {
         }
 
         val title = top.title
+        val meta = buildMetaLine(top)
         val content = "${top.sourceApp} · ${top.progress?.let { "$it%" } ?: "Em andamento"}"
-        val compactView = buildCompactRemoteViews(top)
-        val expandedView = buildExpandedRemoteViews(top)
         val publicVersion = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_download)
             .setContentTitle(title)
@@ -126,8 +122,6 @@ class TransferMonitorService : Service() {
                 colorInt = colorInt,
                 progress = top.progressPercent,
                 contentIntent = contentIntent,
-                compactView = compactView,
-                expandedView = expandedView,
                 publicVersion = publicVersion
             )?.let { return it }
         }
@@ -135,37 +129,22 @@ class TransferMonitorService : Service() {
         return builder
             .setContentTitle(title)
             .setContentText(content)
-            .setStyle(NotificationCompat.DecoratedCustomViewStyle())
-            .setCustomContentView(compactView)
-            .setCustomBigContentView(expandedView)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(meta))
             .setPublicVersion(publicVersion)
             .setProgress(100, top.progressPercent, top.isIndeterminate)
             .build()
     }
 
-    private fun buildCompactRemoteViews(entry: TransferEntry): RemoteViews {
-        return RemoteViews(packageName, R.layout.notification_transfer_compact).apply {
-            setTextViewText(R.id.transfer_title, entry.title)
-            setTextViewText(R.id.transfer_subtitle, entry.sourceApp)
-            setTextViewText(R.id.transfer_percent, if (entry.isIndeterminate) "..." else "${entry.progressPercent}%")
-            setProgressBar(R.id.transfer_progress, 100, entry.progressPercent, entry.isIndeterminate)
-            setImageViewResource(R.id.transfer_icon, R.drawable.logo_foreground)
-        }
-    }
-
-    private fun buildExpandedRemoteViews(entry: TransferEntry): RemoteViews {
-        val meta = buildString {
+    private fun buildMetaLine(entry: TransferEntry): String {
+        return buildString {
+            append("Download em andamento")
+            append(" · ")
             append(entry.sourceApp)
             entry.downloadedBytes?.let { bytes -> append(" · ").append(bytes.formatBytes()) }
             entry.totalBytes?.let { bytes -> append(" / ").append(bytes.formatBytes()) }
-        }
-        return RemoteViews(packageName, R.layout.notification_transfer_expanded).apply {
-            setTextViewText(R.id.transfer_title, entry.title)
-            setTextViewText(R.id.transfer_subtitle, "Download em segundo plano")
-            setTextViewText(R.id.transfer_meta, meta)
-            setTextViewText(R.id.transfer_percent, if (entry.isIndeterminate) "..." else "${entry.progressPercent}%")
-            setProgressBar(R.id.transfer_progress, 100, entry.progressPercent, entry.isIndeterminate)
-            setImageViewResource(R.id.transfer_icon, R.drawable.logo_foreground)
+            if (!entry.isIndeterminate) {
+                append(" · ").append(entry.progressPercent).append("%")
+            }
         }
     }
 
@@ -175,8 +154,6 @@ class TransferMonitorService : Service() {
         colorInt: Int,
         progress: Int,
         contentIntent: PendingIntent,
-        compactView: RemoteViews,
-        expandedView: RemoteViews,
         publicVersion: Notification
     ): Notification? {
         return runCatching {
@@ -196,16 +173,31 @@ class TransferMonitorService : Service() {
                 .setOngoing(true)
                 .setCategory(Notification.CATEGORY_PROGRESS)
                 .setVisibility(Notification.VISIBILITY_PUBLIC)
-                .setColorized(true)
                 .setColor(colorInt)
-                .setCustomContentView(compactView)
-                .setCustomBigContentView(expandedView)
                 .setPublicVersion(publicVersion)
+            if (canRequestPromotedOngoing()) {
+                Notification.Builder::class.java
+                    .getMethod("setRequestPromotedOngoing", Boolean::class.javaPrimitiveType)
+                    .invoke(builder, true)
+            }
             Notification.Builder::class.java
                 .getMethod("setStyle", Notification.Style::class.java)
                 .invoke(builder, style)
             builder.build()
         }.getOrNull()
+    }
+
+    private fun canRequestPromotedOngoing(): Boolean {
+        return if (Build.VERSION.SDK_INT >= 36) {
+            runCatching {
+                val notificationManager = getSystemService(NotificationManager::class.java)
+                NotificationManager::class.java
+                    .getMethod("canPostPromotedNotifications")
+                    .invoke(notificationManager) as Boolean
+            }.getOrDefault(false)
+        } else {
+            false
+        }
     }
 
     companion object {
