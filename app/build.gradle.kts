@@ -12,8 +12,8 @@ android {
         applicationId = "com.monst.transfiranow"
         minSdk = 29
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -24,6 +24,9 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
+            // Signed with debug key so the generated APK is installable for downloads.
+            // Replace with your own keystore before publishing.
+            signingConfig = signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

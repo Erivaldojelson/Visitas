@@ -3,6 +3,14 @@ package com.monst.transfiranow.ui
 import android.graphics.Bitmap
 import android.net.Uri
 import android.widget.ImageView
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -16,6 +24,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -36,7 +45,6 @@ import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Style
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilledTonalButton
@@ -53,6 +61,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -151,7 +160,7 @@ private fun CreateScreen(
 ) {
     LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 120.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
         item { Hero(t("create_head"), t("create_sub"), t("create_hint")) }
-        item { DraftPreview(draft, t("pass")) }
+        item { DraftPreview(draft, t("pass"), t) }
         item {
             ElevatedCard(shape = RoundedCornerShape(28.dp)) {
                 Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -263,43 +272,245 @@ private fun WalletCard(canUseGoogleWallet: Boolean, walletIssuerId: String, wall
 }
 
 @Composable
-private fun DraftPreview(draft: CardDraft, passLabel: String) {
+private fun DraftPreview(draft: CardDraft, passLabel: String, t: (String) -> String) {
     val c = parseColor(draft.passColor)
-    Card(shape = RoundedCornerShape(32.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest)) {
-        Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                PhotoBubble(draft.photoUri, c, Modifier.size(76.dp))
-                Column(Modifier.weight(1f)) { Text(draft.name.ifBlank { "Seu nome" }, style = MaterialTheme.typography.headlineSmall); Text(draft.role.ifBlank { "Cargo ou descrição" }); Text(draft.website.ifBlank { "https://seu-link.com" }, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                Box(Modifier.clip(RoundedCornerShape(18.dp)).background(c.copy(alpha = 0.18f)).padding(horizontal = 14.dp, vertical = 10.dp)) { Text(passLabel, color = c) }
-            }
-            Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(c).padding(18.dp)) { Column { Text(draft.phone.ifBlank { "+55 00 00000-0000" }, color = Color.White); Text(draft.email.ifBlank { "email@exemplo.com" }, color = Color.White); Text(draft.instagram.ifBlank { "@instagram" }, color = Color.White) } }
-            if (draft.qrValue.isNotBlank()) {
-                QrCodeCard(value = draft.qrValue, label = passLabel)
-            }
-        }
-    }
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    ExpandablePassCard(
+        accentColor = c,
+        photoUri = draft.photoUri,
+        badgeText = passLabel,
+        title = draft.name.ifBlank { "Seu nome" },
+        subtitle = draft.role.ifBlank { "Cargo ou descrição" },
+        tertiary = draft.website.ifBlank { "https://seu-link.com" },
+        lines = listOf(
+            t("phone") to draft.phone.ifBlank { "+55 00 00000-0000" },
+            t("email") to draft.email.ifBlank { "email@exemplo.com" },
+            t("instagram") to draft.instagram.ifBlank { "@instagram" }
+        ),
+        qrValue = draft.qrValue,
+        qrLabel = t("qr_code"),
+        expanded = expanded,
+        onToggleExpanded = { expanded = !expanded },
+        footer = null
+    )
 }
 
 @Composable
 private fun SavedPassCard(card: VisitingCard, t: (String) -> String, showDelete: Boolean, onEdit: () -> Unit, onDelete: () -> Unit, onSaveToWallet: () -> Unit) {
     val c = parseColor(card.passColor)
-    ElevatedCard(shape = RoundedCornerShape(30.dp), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
-        Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                PhotoBubble(card.photoUri, c, Modifier.size(64.dp))
-                Column(Modifier.weight(1f)) { Text(card.name, style = MaterialTheme.typography.titleLarge); Text(card.role.ifBlank { "-" }) }
-                Surface(shape = RoundedCornerShape(999.dp), color = c.copy(alpha = 0.18f)) { Text(t("pass"), Modifier.padding(horizontal = 12.dp, vertical = 8.dp), color = c) }
-            }
-            Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(c).padding(16.dp)) { Column { Text(card.phone.ifBlank { "Sem telefone" }, color = Color.White); Text(card.email.ifBlank { "Sem email" }, color = Color.White); Text(card.website.ifBlank { "Sem URL" }, color = Color.White) } }
-            if (card.qrValue.isNotBlank()) {
-                QrCodeCard(value = card.qrValue, label = t("qr_code"))
-            }
+    var expanded by rememberSaveable(card.id) { mutableStateOf(false) }
+    ExpandablePassCard(
+        accentColor = c,
+        photoUri = card.photoUri,
+        badgeText = t("pass"),
+        title = card.name,
+        subtitle = card.role.ifBlank { "-" },
+        tertiary = card.website.ifBlank { "Sem URL" },
+        lines = listOf(
+            t("phone") to card.phone.ifBlank { "Sem telefone" },
+            t("email") to card.email.ifBlank { "Sem email" },
+            t("url") to card.website.ifBlank { "Sem URL" }
+        ),
+        qrValue = card.qrValue,
+        qrLabel = t("qr_code"),
+        expanded = expanded,
+        onToggleExpanded = { expanded = !expanded },
+        footer = {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 FilledTonalButton(onClick = onEdit) { Icon(Icons.Rounded.Edit, null); Spacer(Modifier.width(8.dp)); Text(t(if (showDelete) "edit" else "open_create")) }
                 WalletActionButton(onClick = onSaveToWallet, label = t("wallet_add"), modifier = Modifier.weight(1f))
                 if (showDelete) TextButton(onClick = onDelete) { Icon(Icons.Rounded.Delete, null); Spacer(Modifier.width(4.dp)); Text(t("delete")) }
             }
         }
+    )
+}
+
+@Composable
+private fun ExpandablePassCard(
+    accentColor: Color,
+    photoUri: String,
+    badgeText: String,
+    title: String,
+    subtitle: String,
+    tertiary: String,
+    lines: List<Pair<String, String>>,
+    qrValue: String,
+    qrLabel: String,
+    expanded: Boolean,
+    onToggleExpanded: () -> Unit,
+    footer: (@Composable (() -> Unit))?
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(32.dp)),
+        color = accentColor
+    ) {
+        Column(Modifier.fillMaxWidth().padding(2.dp)) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 140.dp)
+                    .clip(RoundedCornerShape(30.dp))
+                    .clickable { onToggleExpanded() },
+                shape = RoundedCornerShape(30.dp),
+                color = if (expanded) accentColor else MaterialTheme.colorScheme.surfaceContainerLow
+            ) {
+                AnimatedContent(
+                    targetState = expanded,
+                    transitionSpec = {
+                        (fadeIn(tween(220)) + expandVertically(tween(240))).togetherWith(
+                            fadeOut(tween(120)) + shrinkVertically(tween(220))
+                        ).using(SizeTransform(clip = false))
+                    },
+                    label = "expandable-pass"
+                ) { isExpanded ->
+                    if (isExpanded) {
+                        PassTicket(
+                            accentColor = accentColor,
+                            photoUri = photoUri,
+                            badgeText = badgeText,
+                            title = title,
+                            subtitle = subtitle,
+                            tertiary = tertiary,
+                            lines = lines,
+                            qrValue = qrValue,
+                            qrLabel = qrLabel
+                        )
+                    } else {
+                        PassCompact(
+                            accentColor = accentColor,
+                            photoUri = photoUri,
+                            badgeText = badgeText,
+                            title = title,
+                            subtitle = subtitle,
+                            tertiary = tertiary,
+                            lines = lines,
+                            qrValue = qrValue,
+                            qrLabel = qrLabel
+                        )
+                    }
+                }
+            }
+            if (footer != null) {
+                Spacer(Modifier.height(12.dp))
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(30.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow
+                ) {
+                    Box(Modifier.fillMaxWidth().padding(16.dp)) { footer() }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PassCompact(
+    accentColor: Color,
+    photoUri: String,
+    badgeText: String,
+    title: String,
+    subtitle: String,
+    tertiary: String,
+    lines: List<Pair<String, String>>,
+    qrValue: String,
+    qrLabel: String
+) {
+    Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            PhotoBubble(photoUri, accentColor, Modifier.size(64.dp))
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleLarge)
+                Text(subtitle)
+                Text(tertiary, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Surface(shape = RoundedCornerShape(999.dp), color = accentColor.copy(alpha = 0.18f)) {
+                Text(badgeText, Modifier.padding(horizontal = 12.dp, vertical = 8.dp), color = accentColor)
+            }
+        }
+        Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(accentColor).padding(16.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                lines.take(3).forEach { (_, value) -> Text(value, color = Color.White) }
+            }
+        }
+        if (qrValue.isNotBlank()) {
+            QrCodeCard(value = qrValue, label = qrLabel)
+        }
+    }
+}
+
+@Composable
+private fun PassTicket(
+    accentColor: Color,
+    photoUri: String,
+    badgeText: String,
+    title: String,
+    subtitle: String,
+    tertiary: String,
+    lines: List<Pair<String, String>>,
+    qrValue: String,
+    qrLabel: String
+) {
+    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Surface(shape = RoundedCornerShape(26.dp), color = Color.White) {
+            Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    PhotoBubble(photoUri, accentColor, Modifier.size(52.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+                        Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Box(Modifier.clip(RoundedCornerShape(18.dp)).background(accentColor.copy(alpha = 0.14f)).padding(horizontal = 14.dp, vertical = 10.dp)) {
+                        Text(badgeText, color = accentColor, fontWeight = FontWeight.Medium)
+                    }
+                }
+
+                if (tertiary.isNotBlank()) {
+                    Text(tertiary, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+
+                Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerHighest) {
+                    Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        lines.forEach { (label, value) -> TicketLine(label, value) }
+                    }
+                }
+
+                if (qrValue.isNotBlank()) {
+                    TicketQr(value = qrValue, label = qrLabel)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TicketLine(label: String, value: String) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
+        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.width(16.dp))
+        Text(value, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.End, modifier = Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun TicketQr(value: String, label: String) {
+    val bitmap = remember(value) { generateQrBitmap(value) }
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        bitmap?.let {
+            androidx.compose.foundation.Image(
+                bitmap = it.asImageBitmap(),
+                contentDescription = label,
+                modifier = Modifier
+                    .size(220.dp)
+                    .clip(RoundedCornerShape(28.dp))
+                    .background(Color.White)
+                    .padding(14.dp)
+            )
+        }
+        Text(label, style = MaterialTheme.typography.titleMedium)
+        Text(value, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
     }
 }
 

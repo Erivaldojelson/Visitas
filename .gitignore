@@ -30,3 +30,11 @@ Desktop.ini
 # Signing
 *.jks
 *.keystore
+
+# Codex/Android local caches
+.android_home/
+.gradle_user_home/
+
+# Local release artifacts (upload to GitHub Releases instead of committing)
+release/*.apk
+release/*.aab
