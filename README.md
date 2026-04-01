@@ -1,52 +1,51 @@
-# Transfira-now
+# Visitas
 
-`Transfira-now` e um app Android em Kotlin com Jetpack Compose e Material 3 focado em acompanhar downloads em segundo plano e espelhar o progresso em uma notificacao continua preparada para surfaces como lock screen e Now Bar quando o sistema suportar esse fluxo.
+`Visitas` e um app Android em Kotlin com Jetpack Compose para criar cartoes pessoais personalizados, salvar esses cartoes localmente e enviar um passe generico para o Google Wallet pelo caminho oficial.
 
 ## Versao
 
-- `2.0.0`
+- `1.0.0`
 
 ## O que o app faz
 
-- Monitora downloads detectados nas notificacoes de outros apps via `NotificationListenerService`.
-- Inicia downloads reais pelo proprio app usando `DownloadManager`.
-- Mostra uma tela principal inspirada no visual do Nowbar Meter, com estilo Material You.
-- Exibe itens de transferencia com icone de progresso mais expressivo, barra de progresso e status.
-- Mantem notificacao continua em segundo plano.
-- Mostra informacoes publicas de progresso na tela de bloqueio.
-- Tenta usar o caminho de `ProgressStyle` em Android 16 para melhor integracao com superficies de progresso do sistema.
-- Permite personalizar a cor principal do app/notificacao.
+- Cria cartoes estilo cartao de visita com:
+  nome, cargo, celular, email, Instagram, LinkedIn, URL, nota e cor personalizada.
+- Mostra uma previa visual do cartao antes de salvar.
+- Salva os cartoes localmente no app com DataStore.
+- Permite editar e excluir cartoes salvos.
+- Integra com o Google Wallet Android SDK para iniciar o fluxo de salvar passe.
+- Gera o payload do passe generico no app e envia esse payload para um backend que assina o JWT.
 
-## Limitacoes importantes
+## Arquitetura do Google Wallet
 
-- A Samsung nao oferece uma API publica confiavel para forcar um layout customizado dentro da Now Bar.
-- O app segue o caminho suportado pelo Android com notificacao de progresso continua e categorizada, mas a renderizacao final na Now Bar depende da One UI.
-- O monitoramento depende de notificacoes publicadas por outros apps. Se um app nao expuser progresso por notificacao, o `Transfira-now` nao consegue inferir o download com a mesma precisao.
-- O fluxo com mais chance real de aparecer na Now Bar e o download iniciado pelo proprio `Transfira-now`. O modo de terceiros continua como fallback confiavel em lock screen + notificacao continua.
+O app segue o caminho oficial do Google Wallet:
 
-## Tecnologias
+- o app Android monta os dados do passe
+- um backend seu assina o JWT
+- o app chama `savePassesJwt` para abrir o Google Wallet
 
-- Kotlin
-- Jetpack Compose
-- Material 3 / Material You
-- Android foreground service
-- Notification listener
-- Android Splash Screen API
+Isso significa que a assinatura do JWT nao fica dentro do APK. Esse backend e necessario para uso real.
+
+Referencia oficial:
+
+- [Issuing passes with the Android SDK](https://developers.google.com/wallet/generic/android)
 
 ## Estrutura principal
 
 - `app/src/main/java/com/monst/transfiranow/ui`
-  Tela principal e componentes Compose.
-- `app/src/main/java/com/monst/transfiranow/service`
-  Servicos de monitoramento, boot e notificacao.
+  Interface, editor de cartoes e view model.
 - `app/src/main/java/com/monst/transfiranow/data`
-  Modelos e repositorio em memoria.
+  Modelos e persistencia local.
+- `app/src/main/java/com/monst/transfiranow/wallet`
+  Montagem do payload do Google Wallet e cliente do backend JWT.
 
 ## Requisitos
 
 - Android Studio
 - JDK 17+
 - Android SDK 35+
+- Google Wallet disponivel no dispositivo para testes do fluxo nativo
+- Backend proprio para assinar o JWT do passe
 
 ## Como abrir
 
@@ -62,22 +61,12 @@ No Windows:
 
 ## APK
 
-O APK debug gerado fica em:
+O APK atual gerado para distribuicao manual fica em:
 
-- `app/build/outputs/apk/debug/app-debug.apk`
-
-Para distribuir para outras pessoas, o ideal e publicar esse arquivo em um Release do GitHub ou em outra hospedagem de arquivos.
-
-## Permissoes relevantes
-
-- `POST_NOTIFICATIONS`
-- `FOREGROUND_SERVICE`
-- `FOREGROUND_SERVICE_DATA_SYNC`
-- `RECEIVE_BOOT_COMPLETED`
-- `BIND_NOTIFICATION_LISTENER_SERVICE` no servico de listener
+- `release/Visitas-1.0.0.apk`
 
 ## Proximos passos sugeridos
 
-- Persistir preferencias com DataStore.
-- Adicionar historico de transferencias.
-- Assinar uma build release para distribuicao publica.
+- Criar backend simples para assinar o JWT do Google Wallet.
+- Adicionar exportacao de imagem ou PDF do cartao.
+- Criar uma build release assinada para distribuicao publica.

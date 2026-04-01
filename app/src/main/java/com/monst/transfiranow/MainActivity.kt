@@ -1,74 +1,70 @@
 package com.monst.transfiranow
 
-import android.Manifest
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.ContextCompat
+import androidx.activity.viewModels
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import com.monst.transfiranow.data.AppDownloadManager
-import com.monst.transfiranow.data.TransferRepository
-import com.monst.transfiranow.service.AppDownloadLiveUpdateService
-import com.monst.transfiranow.service.TransferMonitorService
-import com.monst.transfiranow.ui.TransfiraNowApp
+import com.google.android.gms.pay.Pay
+import com.google.android.gms.pay.PayApiAvailabilityStatus
+import com.google.android.gms.pay.PayClient
+import com.monst.transfiranow.data.VisitingCard
+import com.monst.transfiranow.ui.VisitasApp
+import com.monst.transfiranow.ui.VisitasViewModel
 
 class MainActivity : ComponentActivity() {
-
-    private val notificationPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted || Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-            startMonitorService()
-        }
-    }
+    private lateinit var walletClient: PayClient
+    private val viewModel: VisitasViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        requestNotificationPermissionIfNeeded()
-        startMonitorService()
+        walletClient = Pay.getClient(this)
+        checkWalletAvailability()
 
         setContent {
-            TransfiraNowApp(
-                onEnsureMonitor = { startMonitorService() },
-                onStartDownload = { url ->
-                    val result = AppDownloadManager.enqueue(this, url)
-                    result.onSuccess {
-                        startMonitorService()
-                        startAppLiveUpdateService()
-                        TransferRepository.setDownloadUrl("")
-                    }.onFailure { error ->
-                        TransferRepository.setHelperMessage(
-                            error.message ?: "Não foi possível iniciar o download."
-                        )
+            VisitasApp(
+                viewModel = viewModel,
+                onSaveToWallet = { card ->
+                    viewModel.prepareWalletJwt(card) { jwt ->
+                        walletClient.savePassesJwt(jwt, this, ADD_TO_WALLET_REQUEST_CODE)
                     }
                 }
             )
         }
     }
 
-    private fun requestNotificationPermissionIfNeeded() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+    private fun checkWalletAvailability() {
+        walletClient
+            .getPayApiAvailabilityStatus(PayClient.RequestType.SAVE_PASSES)
+            .addOnSuccessListener { status ->
+                viewModel.setWalletAvailability(status == PayApiAvailabilityStatus.AVAILABLE)
+            }
+            .addOnFailureListener {
+                viewModel.setWalletAvailability(false)
+                viewModel.onWalletSaveResult("Google Wallet não está disponível neste dispositivo.")
+            }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != ADD_TO_WALLET_REQUEST_CODE) return
+
+        when (resultCode) {
+            RESULT_OK -> viewModel.onWalletSaveResult("Cartão salvo no Google Wallet com sucesso.")
+            RESULT_CANCELED -> viewModel.onWalletSaveResult("Operação cancelada no Google Wallet.")
+            PayClient.SavePassesResult.SAVE_ERROR -> {
+                val message = data?.getStringExtra(PayClient.EXTRA_API_ERROR_MESSAGE)
+                viewModel.onWalletSaveResult(message ?: "Erro ao salvar no Google Wallet.")
+            }
+            else -> viewModel.onWalletSaveResult("Falha inesperada ao abrir o Google Wallet.")
         }
     }
 
-    private fun startMonitorService() {
-        ContextCompat.startForegroundService(
-            this,
-            Intent(this, TransferMonitorService::class.java)
-        )
-    }
-
-    private fun startAppLiveUpdateService() {
-        ContextCompat.startForegroundService(
-            this,
-            Intent(this, AppDownloadLiveUpdateService::class.java)
-        )
+    companion object {
+        private const val ADD_TO_WALLET_REQUEST_CODE = 2401
     }
 }
