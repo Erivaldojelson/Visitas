@@ -12,7 +12,12 @@
         android:theme="@style/Theme.TransfiraNow.Starting">
 
         <activity
-            android:name=".MainActivity"
+            android:name=".cards.ui.CardResultActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TransfiraNow" />
+
+        <activity
+            android:name=".cards.ui.CreateCardActivity"
             android:exported="true"
             android:theme="@style/Theme.TransfiraNow.Starting">
             <intent-filter>
@@ -20,6 +25,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TransfiraNow.Starting" />
     </application>
 
 </manifest>

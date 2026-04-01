@@ -1,0 +1,23 @@
+<resources>
+    <string name="create_card_title">Criar cartão</string>
+    <string name="card_result_title">Seu QR Code</string>
+    <string name="create_card_subtitle">Preencha os dados e gere um QR Code para compartilhar.</string>
+
+    <string name="field_name">Nome</string>
+    <string name="field_photo_url">Foto (URL)</string>
+    <string name="field_instagram">Instagram (opcional)</string>
+    <string name="field_whatsapp">WhatsApp (opcional)</string>
+    <string name="field_website">Website (opcional)</string>
+
+    <string name="create_card_button">Create Card</string>
+
+    <string name="error_name_required">Informe seu nome.</string>
+    <string name="error_photo_required">Informe a URL da foto.</string>
+    <string name="error_photo_invalid">URL da foto inválida.</string>
+    <string name="error_website_invalid">URL do website inválida.</string>
+
+    <string name="photo_desc">Foto do usuário</string>
+    <string name="qr_desc">QR Code</string>
+    <string name="qr_hint">Aponte a câmera para abrir seu cartão.</string>
+</resources>
+
