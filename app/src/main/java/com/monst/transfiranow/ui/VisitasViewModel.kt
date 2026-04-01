@@ -62,6 +62,7 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
                     note = card.note,
                     photoUri = card.photoUri,
                     walletPhotoUrl = card.walletPhotoUrl,
+                    qrValue = card.qrValue,
                     passColor = card.passColor
                 ),
                 statusMessage = message(it.appLanguage, "editing", card.name)

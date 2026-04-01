@@ -45,6 +45,7 @@ class CardStore(private val context: Context) {
             note = draft.note.trim(),
             photoUri = draft.photoUri.trim(),
             walletPhotoUrl = draft.walletPhotoUrl.trim(),
+            qrValue = draft.qrValue.trim(),
             passColor = draft.passColor,
             updatedAt = System.currentTimeMillis()
         )
@@ -95,6 +96,7 @@ class CardStore(private val context: Context) {
                         .put("note", card.note)
                         .put("photoUri", card.photoUri)
                         .put("walletPhotoUrl", card.walletPhotoUrl)
+                        .put("qrValue", card.qrValue)
                         .put("passColor", card.passColor)
                         .put("updatedAt", card.updatedAt)
                 )
@@ -123,6 +125,7 @@ class CardStore(private val context: Context) {
                             note = item.optString("note"),
                             photoUri = item.optString("photoUri"),
                             walletPhotoUrl = item.optString("walletPhotoUrl"),
+                            qrValue = item.optString("qrValue"),
                             passColor = item.optString("passColor", item.optString("hexColor", "#1E3A8A")),
                             updatedAt = item.optLong("updatedAt", 0L)
                         )

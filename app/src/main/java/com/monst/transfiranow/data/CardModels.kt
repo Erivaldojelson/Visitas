@@ -25,6 +25,7 @@ data class VisitingCard(
     val note: String,
     val photoUri: String,
     val walletPhotoUrl: String,
+    val qrValue: String,
     val passColor: String,
     val updatedAt: Long
 )
@@ -41,6 +42,7 @@ data class CardDraft(
     val note: String = "",
     val photoUri: String = "",
     val walletPhotoUrl: String = "",
+    val qrValue: String = "",
     val passColor: String = "#1E3A8A"
 )
 

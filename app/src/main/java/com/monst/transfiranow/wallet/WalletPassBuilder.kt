@@ -53,6 +53,8 @@ object WalletPassBuilder {
             genericObject.put("logo", image)
         }
 
+        barcode(card.qrValue)?.let { genericObject.put("barcode", it) }
+
         return JSONObject()
             .put("iss", "backend-signs-this")
             .put("aud", "google")
@@ -85,6 +87,14 @@ object WalletPassBuilder {
             "sourceUri",
             JSONObject().put("uri", url)
         )
+    }
+
+    private fun barcode(value: String): JSONObject? {
+        if (value.isBlank()) return null
+        return JSONObject()
+            .put("type", "QR_CODE")
+            .put("value", value)
+            .put("alternateText", value)
     }
 
     private fun normalizeUrl(handleOrUrl: String, prefix: String): String {
