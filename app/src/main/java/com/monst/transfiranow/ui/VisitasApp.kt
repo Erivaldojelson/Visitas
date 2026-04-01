@@ -87,7 +87,12 @@ import com.monst.transfiranow.ui.theme.TransfiraNowTheme
 private enum class AppTab { HOME, CREATE, SAVED, SETTINGS }
 
 @Composable
-fun VisitasApp(onPickPhoto: () -> Unit, onSaveToWallet: (VisitingCard) -> Unit, viewModel: VisitasViewModel = viewModel()) {
+fun VisitasApp(
+    onPickPhoto: () -> Unit,
+    onPickQrCode: () -> Unit,
+    onSaveToWallet: (VisitingCard) -> Unit,
+    viewModel: VisitasViewModel = viewModel()
+) {
     val uiState by viewModel.uiState.collectAsState()
     var tab by remember { mutableStateOf(AppTab.HOME) }
     val t: (String) -> String = { key -> tr(uiState.appLanguage, key) }
@@ -100,7 +105,7 @@ fun VisitasApp(onPickPhoto: () -> Unit, onSaveToWallet: (VisitingCard) -> Unit, 
                 AppTab.HOME -> CardsScreen(padding, t("home_head"), t("home_sub"), uiState.statusMessage, uiState.cards.take(10), t, false, onSaveToWallet, {}) {
                     viewModel.editCard(it); tab = AppTab.CREATE
                 }
-                AppTab.CREATE -> CreateScreen(padding, uiState.draft, uiState.canUseGoogleWallet, uiState.walletIssuerId, uiState.walletClassSuffix, uiState.walletBackendUrl, t, onPickPhoto, viewModel::updateDraft, viewModel::updateWalletSettings, viewModel::saveDraft, viewModel::persistWalletSettings, viewModel::clearDraft)
+                AppTab.CREATE -> CreateScreen(padding, uiState.draft, uiState.canUseGoogleWallet, uiState.walletIssuerId, uiState.walletClassSuffix, uiState.walletBackendUrl, t, onPickPhoto, onPickQrCode, viewModel::updateDraft, viewModel::updateWalletSettings, viewModel::saveDraft, viewModel::persistWalletSettings, viewModel::clearDraft, viewModel::clearDraftQr)
                 AppTab.SAVED -> CardsScreen(padding, t("saved_head"), t("saved_sub"), "${uiState.cards.size} ${t("saved_count")}", uiState.cards, t, true, onSaveToWallet, { viewModel.deleteCard(it.id) }) {
                     viewModel.editCard(it); tab = AppTab.CREATE
                 }
@@ -152,11 +157,13 @@ private fun CreateScreen(
     walletBackendUrl: String,
     t: (String) -> String,
     onPickPhoto: () -> Unit,
+    onPickQrCode: () -> Unit,
     onDraftChange: ((CardDraft) -> CardDraft) -> Unit,
     onWalletSettingsChange: (String?, String?, String?) -> Unit,
     onCreatePass: () -> Unit,
     onPersistWalletSettings: () -> Unit,
-    onClearDraft: () -> Unit
+    onClearDraft: () -> Unit,
+    onClearQr: () -> Unit
 ) {
     LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 120.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
         item { Hero(t("create_head"), t("create_sub"), t("create_hint")) }
@@ -173,7 +180,7 @@ private fun CreateScreen(
             }
         }
         item {
-            EditorCard(draft, canUseGoogleWallet, walletIssuerId, walletClassSuffix, walletBackendUrl, t, onDraftChange, onWalletSettingsChange, onCreatePass, onPersistWalletSettings, onClearDraft)
+            EditorCard(draft, canUseGoogleWallet, walletIssuerId, walletClassSuffix, walletBackendUrl, t, onPickQrCode, onDraftChange, onWalletSettingsChange, onCreatePass, onPersistWalletSettings, onClearDraft, onClearQr)
         }
     }
 }
@@ -186,11 +193,13 @@ private fun EditorCard(
     walletClassSuffix: String,
     walletBackendUrl: String,
     t: (String) -> String,
+    onPickQrCode: () -> Unit,
     onDraftChange: ((CardDraft) -> CardDraft) -> Unit,
     onWalletSettingsChange: (String?, String?, String?) -> Unit,
     onCreatePass: () -> Unit,
     onPersistWalletSettings: () -> Unit,
-    onClearDraft: () -> Unit
+    onClearDraft: () -> Unit,
+    onClearQr: () -> Unit
 ) {
     ElevatedCard(shape = RoundedCornerShape(28.dp)) {
         Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -203,7 +212,18 @@ private fun EditorCard(
             Field(draft.website, t("url")) { onDraftChange { d -> d.copy(website = it) } }
             Field(draft.note, t("note")) { onDraftChange { d -> d.copy(note = it) } }
             Field(draft.walletPhotoUrl, t("wallet_photo")) { onDraftChange { d -> d.copy(walletPhotoUrl = it) } }
-            Field(draft.qrValue, t("qr_code")) { onDraftChange { d -> d.copy(qrValue = it) } }
+
+            Text(t("qr_code"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
+            if (draft.qrValue.isBlank()) {
+                FilledTonalButton(onClick = onPickQrCode) { Text(t("qr_pick")) }
+            } else {
+                QrCodeCard(value = draft.qrValue, label = t("qr_code"), showValueText = false)
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    FilledTonalButton(onClick = onPickQrCode) { Text(t("qr_change")) }
+                    TextButton(onClick = onClearQr) { Text(t("qr_remove")) }
+                }
+            }
+
             Text(t("pass_color"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
             ColorPicker(draft.passColor) { color -> onDraftChange { d -> d.copy(passColor = color) } }
             WalletCard(canUseGoogleWallet, walletIssuerId, walletClassSuffix, walletBackendUrl, t, onWalletSettingsChange, onPersistWalletSettings)
@@ -298,7 +318,7 @@ private fun DraftPreview(draft: CardDraft, passLabel: String, t: (String) -> Str
 @Composable
 private fun SavedPassCard(card: VisitingCard, t: (String) -> String, showDelete: Boolean, onEdit: () -> Unit, onDelete: () -> Unit, onSaveToWallet: () -> Unit) {
     val c = parseColor(card.passColor)
-    var expanded by rememberSaveable(card.id) { mutableStateOf(false) }
+    var expanded by rememberSaveable(card.id) { mutableStateOf(card.qrValue.isNotBlank()) }
     ExpandablePassCard(
         accentColor = c,
         photoUri = card.photoUri,
@@ -535,7 +555,7 @@ private fun TicketQr(value: String, label: String) {
 }
 
 @Composable
-private fun QrCodeCard(value: String, label: String) {
+private fun QrCodeCard(value: String, label: String, showValueText: Boolean = true) {
     val bitmap = remember(value) { generateQrBitmap(value) }
     ElevatedCard(shape = RoundedCornerShape(24.dp), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
         Row(
@@ -558,7 +578,9 @@ private fun QrCodeCard(value: String, label: String) {
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(label, style = MaterialTheme.typography.titleMedium)
-                Text(value, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (showValueText) {
+                    Text(value, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
     }
@@ -586,7 +608,8 @@ private fun generateQrBitmap(value: String): Bitmap? = runCatching {
 
 private fun tr(language: AppLanguage, key: String): String {
     val pt = mapOf("home" to "Home", "create" to "Criar", "saved" to "Salvos", "settings" to "Config.", "home_head" to "10 cartões recentes", "home_sub" to "A tela inicial mostra até dez cartões recentes.", "home_empty_title" to "Sem cartões recentes", "home_empty_body" to "Crie um passe para vê-lo aqui.", "create_head" to "Criar cartão", "create_sub" to "Abra o campo criar e monte o passe.", "create_hint" to "Personalize apenas a cor do passe.", "saved_head" to "Todos os cartões salvos", "saved_sub" to "Aqui ficam todos os cartões guardados.", "saved_count" to "cartões salvos", "saved_empty_title" to "Sem cartões salvos", "saved_empty_body" to "Os cartões criados aparecem aqui.", "settings_head" to "Configurações", "settings_sub" to "Versão, GitHub, idioma e Google Wallet.", "version" to "Versão", "github" to "Minha conta do GitHub", "language" to "Idioma do app", "open_create" to "Abrir criar", "edit" to "Editar", "delete" to "Excluir", "pass" to "Passe", "add_photo" to "Adicionar foto", "change_photo" to "Trocar foto", "photo_hint" to "A foto fica salva no app. Para aparecer no Google Wallet, use uma URL pública.", "name" to "Nome", "role" to "Cargo", "phone" to "Celular", "email" to "Email", "instagram" to "Instagram", "linkedin" to "LinkedIn", "url" to "URL", "note" to "Nota", "qr_code" to "QR code", "wallet_photo" to "URL pública da foto para o Wallet", "pass_color" to "Cor do passe", "create_pass" to "Criar passe", "clear" to "Limpar", "wallet" to "Google Wallet", "wallet_on" to "Google Wallet disponível neste aparelho.", "wallet_off" to "Google Wallet indisponível ou não elegível neste aparelho.", "backend" to "URL do backend JWT", "wallet_save" to "Salvar configuração do Wallet", "wallet_add" to "Salvar no Wallet")
-    val en = mapOf("home" to "Home", "create" to "Create", "saved" to "Saved", "settings" to "Settings", "home_head" to "10 recent cards", "home_sub" to "The home screen shows up to ten recent cards.", "home_empty_title" to "No recent cards", "home_empty_body" to "Create a pass to see it here.", "create_head" to "Create card", "create_sub" to "Open the create area and build the pass.", "create_hint" to "Only customize the pass color.", "saved_head" to "All saved cards", "saved_sub" to "Every saved card appears here.", "saved_count" to "saved cards", "saved_empty_title" to "No saved cards", "saved_empty_body" to "Created cards appear here.", "settings_head" to "Settings", "settings_sub" to "Version, GitHub, language and Google Wallet.", "version" to "Version", "github" to "My GitHub account", "language" to "App language", "open_create" to "Open create", "edit" to "Edit", "delete" to "Delete", "pass" to "Pass", "add_photo" to "Add photo", "change_photo" to "Change photo", "photo_hint" to "The photo is saved in the app. To show in Google Wallet, use a public image URL.", "name" to "Name", "role" to "Role", "phone" to "Phone", "email" to "Email", "instagram" to "Instagram", "linkedin" to "LinkedIn", "url" to "URL", "note" to "Note", "qr_code" to "QR code", "wallet_photo" to "Public photo URL for Wallet", "pass_color" to "Pass color", "create_pass" to "Create pass", "clear" to "Clear", "wallet" to "Google Wallet", "wallet_on" to "Google Wallet is available on this device.", "wallet_off" to "Google Wallet is unavailable or not eligible on this device.", "backend" to "JWT backend URL", "wallet_save" to "Save Wallet settings", "wallet_add" to "Save to Wallet")
-    val zh = mapOf("home" to "首页", "create" to "创建", "saved" to "已保存", "settings" to "设置", "home_head" to "最近 10 张卡片", "home_sub" to "首页最多显示十张最近卡片。", "home_empty_title" to "没有最近卡片", "home_empty_body" to "创建通行证后会显示在这里。", "create_head" to "创建卡片", "create_sub" to "打开创建区域并制作通行证。", "create_hint" to "只允许自定义通行证颜色。", "saved_head" to "所有已保存卡片", "saved_sub" to "所有保存的卡片都在这里。", "saved_count" to "张已保存卡片", "saved_empty_title" to "没有已保存卡片", "saved_empty_body" to "已创建的卡片会显示在这里。", "settings_head" to "设置", "settings_sub" to "版本、GitHub、语言和 Google Wallet。", "version" to "版本", "github" to "我的 GitHub 账号", "language" to "应用语言", "open_create" to "打开创建", "edit" to "编辑", "delete" to "删除", "pass" to "通行证", "add_photo" to "添加照片", "change_photo" to "更换照片", "photo_hint" to "照片会保存在应用中。若要显示在 Google Wallet 中，请使用公开图片链接。", "name" to "姓名", "role" to "职位", "phone" to "手机", "email" to "邮箱", "instagram" to "Instagram", "linkedin" to "LinkedIn", "url" to "链接", "note" to "备注", "qr_code" to "二维码", "wallet_photo" to "Wallet 公开照片链接", "pass_color" to "通行证颜色", "create_pass" to "创建通行证", "clear" to "清空", "wallet" to "Google Wallet", "wallet_on" to "此设备支持 Google Wallet。", "wallet_off" to "此设备不支持 Google Wallet。", "backend" to "JWT 后端地址", "wallet_save" to "保存 Wallet 设置", "wallet_add" to "保存到 Wallet")
-    return when (language) { AppLanguage.EN -> en[key] ?: key; AppLanguage.ZH -> zh[key] ?: key; else -> pt[key] ?: key }
+    val pt2 = pt + mapOf("qr_pick" to "Selecionar imagem de QR Code", "qr_change" to "Trocar QR", "qr_remove" to "Remover QR")
+    val en = mapOf("home" to "Home", "create" to "Create", "saved" to "Saved", "settings" to "Settings", "home_head" to "10 recent cards", "home_sub" to "The home screen shows up to ten recent cards.", "home_empty_title" to "No recent cards", "home_empty_body" to "Create a pass to see it here.", "create_head" to "Create card", "create_sub" to "Open the create area and build the pass.", "create_hint" to "Only customize the pass color.", "saved_head" to "All saved cards", "saved_sub" to "Every saved card appears here.", "saved_count" to "saved cards", "saved_empty_title" to "No saved cards", "saved_empty_body" to "Created cards appear here.", "settings_head" to "Settings", "settings_sub" to "Version, GitHub, language and Google Wallet.", "version" to "Version", "github" to "My GitHub account", "language" to "App language", "open_create" to "Open create", "edit" to "Edit", "delete" to "Delete", "pass" to "Pass", "add_photo" to "Add photo", "change_photo" to "Change photo", "photo_hint" to "The photo is saved in the app. To show in Google Wallet, use a public image URL.", "name" to "Name", "role" to "Role", "phone" to "Phone", "email" to "Email", "instagram" to "Instagram", "linkedin" to "LinkedIn", "url" to "URL", "note" to "Note", "qr_code" to "QR code", "wallet_photo" to "Public photo URL for Wallet", "pass_color" to "Pass color", "create_pass" to "Create pass", "clear" to "Clear", "wallet" to "Google Wallet", "wallet_on" to "Google Wallet is available on this device.", "wallet_off" to "Google Wallet is unavailable or not eligible on this device.", "backend" to "JWT backend URL", "wallet_save" to "Save Wallet settings", "wallet_add" to "Save to Wallet", "qr_pick" to "Select QR Code image", "qr_change" to "Change QR", "qr_remove" to "Remove QR")
+    val zh = mapOf("home" to "首页", "create" to "创建", "saved" to "已保存", "settings" to "设置", "home_head" to "最近 10 张卡片", "home_sub" to "首页最多显示十张最近卡片。", "home_empty_title" to "没有最近卡片", "home_empty_body" to "创建通行证后会显示在这里。", "create_head" to "创建卡片", "create_sub" to "打开创建区域并制作通行证。", "create_hint" to "只允许自定义通行证颜色。", "saved_head" to "所有已保存卡片", "saved_sub" to "所有保存的卡片都在这里。", "saved_count" to "张已保存卡片", "saved_empty_title" to "没有已保存卡片", "saved_empty_body" to "已创建的卡片会显示在这里。", "settings_head" to "设置", "settings_sub" to "版本、GitHub、语言和 Google Wallet。", "version" to "版本", "github" to "我的 GitHub 账号", "language" to "应用语言", "open_create" to "打开创建", "edit" to "编辑", "delete" to "删除", "pass" to "通行证", "add_photo" to "添加照片", "change_photo" to "更换照片", "photo_hint" to "照片会保存在应用中。若要显示在 Google Wallet 中，请使用公开图片链接。", "name" to "姓名", "role" to "职位", "phone" to "手机", "email" to "邮箱", "instagram" to "Instagram", "linkedin" to "LinkedIn", "url" to "链接", "note" to "备注", "qr_code" to "二维码", "wallet_photo" to "Wallet 公开照片链接", "pass_color" to "通行证颜色", "create_pass" to "创建通行证", "clear" to "清空", "wallet" to "Google Wallet", "wallet_on" to "此设备支持 Google Wallet。", "wallet_off" to "此设备不支持 Google Wallet。", "backend" to "JWT 后端地址", "wallet_save" to "保存 Wallet 设置", "wallet_add" to "保存到 Wallet", "qr_pick" to "选择二维码图片", "qr_change" to "更换二维码", "qr_remove" to "移除二维码")
+    return when (language) { AppLanguage.EN -> en[key] ?: key; AppLanguage.ZH -> zh[key] ?: key; else -> pt2[key] ?: key }
 }

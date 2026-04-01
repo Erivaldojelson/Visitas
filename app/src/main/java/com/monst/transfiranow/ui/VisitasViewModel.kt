@@ -83,6 +83,24 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun updateDraftQrValue(qrValue: String) {
+        _uiState.update {
+            it.copy(
+                draft = it.draft.copy(qrValue = qrValue),
+                statusMessage = message(it.appLanguage, "qr_added")
+            )
+        }
+    }
+
+    fun clearDraftQr() {
+        _uiState.update {
+            it.copy(
+                draft = it.draft.copy(qrValue = ""),
+                statusMessage = message(it.appLanguage, "qr_cleared")
+            )
+        }
+    }
+
     fun updateWalletSettings(issuerId: String? = null, classSuffix: String? = null, backendUrl: String? = null) {
         _uiState.update {
             it.copy(
@@ -194,6 +212,8 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
                 "editing" -> "Editando $arg."
                 "draft_cleared" -> "Campo de criação limpo."
                 "photo_added" -> "Foto adicionada ao passe."
+                "qr_added" -> "QR Code adicionado ao passe."
+                "qr_cleared" -> "QR Code removido do passe."
                 "language_changed" -> "Idioma atualizado."
                 "need_name" -> "Preencha pelo menos o nome do passe."
                 "pass_saved" -> "Passe salvo no app."
@@ -209,6 +229,8 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
                 "editing" -> "A editar $arg."
                 "draft_cleared" -> "Campo de criação limpo."
                 "photo_added" -> "Fotografia adicionada ao passe."
+                "qr_added" -> "QR Code adicionado ao passe."
+                "qr_cleared" -> "QR Code removido do passe."
                 "language_changed" -> "Idioma atualizado."
                 "need_name" -> "Preencha pelo menos o nome do passe."
                 "pass_saved" -> "Passe guardado na aplicação."
@@ -224,6 +246,8 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
                 "editing" -> "Editing $arg."
                 "draft_cleared" -> "Create form cleared."
                 "photo_added" -> "Photo added to the pass."
+                "qr_added" -> "QR Code added to the pass."
+                "qr_cleared" -> "QR Code removed from the pass."
                 "language_changed" -> "Language updated."
                 "need_name" -> "Fill in at least the pass name."
                 "pass_saved" -> "Pass saved in the app."
@@ -239,6 +263,8 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
                 "editing" -> "正在编辑 $arg。"
                 "draft_cleared" -> "创建表单已清空。"
                 "photo_added" -> "照片已添加到通行证。"
+                "qr_added" -> "二维码已添加到通行证。"
+                "qr_cleared" -> "二维码已从通行证移除。"
                 "language_changed" -> "语言已更新。"
                 "need_name" -> "请至少填写通行证名称。"
                 "pass_saved" -> "通行证已保存在应用中。"
