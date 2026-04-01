@@ -9,10 +9,13 @@
 ## O que o app faz
 
 - Cria cartoes estilo cartao de visita com:
-  nome, cargo, celular, email, Instagram, LinkedIn, URL, nota e cor personalizada.
-- Mostra uma previa visual do cartao antes de salvar.
+  nome, cargo, celular, email, Instagram, LinkedIn, URL, nota, foto e cor do passe.
+- Mostra uma previa visual do passe antes de salvar.
 - Salva os cartoes localmente no app com DataStore.
 - Permite editar e excluir cartoes salvos.
+- Tem navegacao inferior em pilula com Home, Criar, Salvos e Configuracoes.
+- Mostra os 10 cartoes mais recentes na Home e todos os cartoes na aba Salvos.
+- Permite trocar o idioma do app para Portugues (Brasil, Portugal e Angola), Ingles e Chines.
 - Integra com o Google Wallet Android SDK para iniciar o fluxo de salvar passe.
 - Gera o payload do passe generico no app e envia esse payload para um backend que assina o JWT.
 
@@ -38,6 +41,8 @@ Referencia oficial:
   Modelos e persistencia local.
 - `app/src/main/java/com/monst/transfiranow/wallet`
   Montagem do payload do Google Wallet e cliente do backend JWT.
+- `backend`
+  Backend minimo para assinar o JWT do Google Wallet.
 
 ## Requisitos
 
@@ -67,6 +72,5 @@ O APK atual gerado para distribuicao manual fica em:
 
 ## Proximos passos sugeridos
 
-- Criar backend simples para assinar o JWT do Google Wallet.
 - Adicionar exportacao de imagem ou PDF do cartao.
 - Criar uma build release assinada para distribuicao publica.

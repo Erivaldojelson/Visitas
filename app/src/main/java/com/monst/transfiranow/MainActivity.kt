@@ -2,6 +2,7 @@ package com.monst.transfiranow
 
 import android.content.Intent
 import android.os.Bundle
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -17,6 +18,14 @@ import com.monst.transfiranow.ui.VisitasViewModel
 class MainActivity : ComponentActivity() {
     private lateinit var walletClient: PayClient
     private val viewModel: VisitasViewModel by viewModels()
+    private val photoPicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri ?: return@registerForActivityResult
+        contentResolver.takePersistableUriPermission(
+            uri,
+            Intent.FLAG_GRANT_READ_URI_PERMISSION
+        )
+        viewModel.updateDraftPhoto(uri.toString())
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -28,6 +37,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             VisitasApp(
                 viewModel = viewModel,
+                onPickPhoto = { photoPicker.launch(arrayOf("image/*")) },
                 onSaveToWallet = { card ->
                     viewModel.prepareWalletJwt(card) { jwt ->
                         walletClient.savePassesJwt(jwt, this, ADD_TO_WALLET_REQUEST_CODE)

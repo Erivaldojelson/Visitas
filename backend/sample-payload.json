@@ -1,0 +1,77 @@
+{
+  "payload": {
+    "genericClasses": [
+      {
+        "id": "ISSUER_ID.visitas_class",
+        "reviewStatus": "UNDER_REVIEW",
+        "cardTitle": {
+          "defaultValue": {
+            "language": "pt-BR",
+            "value": "Visitas"
+          }
+        }
+      }
+    ],
+    "genericObjects": [
+      {
+        "id": "ISSUER_ID.card_demo_001",
+        "classId": "ISSUER_ID.visitas_class",
+        "hexBackgroundColor": "#0F766E",
+        "cardTitle": {
+          "defaultValue": {
+            "language": "pt-BR",
+            "value": "Joao Silva"
+          }
+        },
+        "subheader": {
+          "defaultValue": {
+            "language": "pt-BR",
+            "value": "Engenheiro de Software"
+          }
+        },
+        "header": {
+          "defaultValue": {
+            "language": "pt-BR",
+            "value": "+55 11 99999-9999"
+          }
+        },
+        "textModulesData": [
+          {
+            "header": "Telefone",
+            "body": "+55 11 99999-9999"
+          },
+          {
+            "header": "Email",
+            "body": "joao@example.com"
+          },
+          {
+            "header": "LinkedIn",
+            "body": "joaosilva"
+          }
+        ],
+        "linksModuleData": {
+          "uris": [
+            {
+              "description": {
+                "defaultValue": {
+                  "language": "pt-BR",
+                  "value": "Website"
+                }
+              },
+              "uri": "https://example.com"
+            },
+            {
+              "description": {
+                "defaultValue": {
+                  "language": "pt-BR",
+                  "value": "Email"
+                }
+              },
+              "uri": "mailto:joao@example.com"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

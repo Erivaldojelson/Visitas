@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Visitas</string>
+    <string name="add_to_google_wallet_button_content_description">Adicionar ao Google Wallet</string>
 </resources>

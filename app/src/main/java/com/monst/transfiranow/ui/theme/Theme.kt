@@ -29,12 +29,20 @@ fun TransfiraNowTheme(
         darkTheme -> darkColorScheme(
             primary = accentColor,
             secondary = accentColor.copy(alpha = 0.88f),
-            tertiary = accentColor.copy(alpha = 0.72f)
+            tertiary = accentColor.copy(alpha = 0.72f),
+            surface = Color(0xFF141218),
+            surfaceContainer = Color(0xFF211F26),
+            surfaceContainerHigh = Color(0xFF2B2930),
+            surfaceContainerHighest = Color(0xFF35333A)
         )
         else -> lightColorScheme(
             primary = accentColor,
             secondary = accentColor.copy(alpha = 0.88f),
-            tertiary = accentColor.copy(alpha = 0.72f)
+            tertiary = accentColor.copy(alpha = 0.72f),
+            surface = Color(0xFFFFF8FC),
+            surfaceContainer = Color(0xFFF3EDF7),
+            surfaceContainerHigh = Color(0xFFECE6F0),
+            surfaceContainerHighest = Color(0xFFE6E0E9)
         )
     }
 

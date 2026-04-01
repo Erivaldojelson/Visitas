@@ -3,6 +3,7 @@ package com.monst.transfiranow.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.monst.transfiranow.data.AppLanguage
 import com.monst.transfiranow.data.CardDraft
 import com.monst.transfiranow.data.CardStore
 import com.monst.transfiranow.data.CardsUiState
@@ -29,7 +30,13 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
                         cards = persisted.cards,
                         walletIssuerId = persisted.walletIssuerId,
                         walletClassSuffix = persisted.walletClassSuffix,
-                        walletBackendUrl = persisted.walletBackendUrl
+                        walletBackendUrl = persisted.walletBackendUrl,
+                        appLanguage = persisted.appLanguage,
+                        statusMessage = if (it.statusMessage == CardsUiState().statusMessage) {
+                            message(persisted.appLanguage, "create_intro")
+                        } else {
+                            it.statusMessage
+                        }
                     )
                 }
             }
@@ -53,15 +60,26 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
                     linkedin = card.linkedin,
                     website = card.website,
                     note = card.note,
-                    hexColor = card.hexColor
+                    photoUri = card.photoUri,
+                    walletPhotoUrl = card.walletPhotoUrl,
+                    passColor = card.passColor
                 ),
-                statusMessage = "Editando ${card.name}."
+                statusMessage = message(it.appLanguage, "editing", card.name)
             )
         }
     }
 
     fun clearDraft() {
-        _uiState.update { it.copy(draft = CardDraft()) }
+        _uiState.update { it.copy(draft = CardDraft(), statusMessage = message(it.appLanguage, "draft_cleared")) }
+    }
+
+    fun updateDraftPhoto(photoUri: String) {
+        _uiState.update {
+            it.copy(
+                draft = it.draft.copy(photoUri = photoUri),
+                statusMessage = message(it.appLanguage, "photo_added")
+            )
+        }
     }
 
     fun updateWalletSettings(issuerId: String? = null, classSuffix: String? = null, backendUrl: String? = null) {
@@ -74,22 +92,35 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun updateLanguage(language: AppLanguage) {
+        _uiState.update {
+            it.copy(
+                appLanguage = language,
+                statusMessage = message(language, "language_changed")
+            )
+        }
+        viewModelScope.launch {
+            store.persistLanguage(language)
+        }
+    }
+
     fun setWalletAvailability(available: Boolean) {
         _uiState.update { it.copy(canUseGoogleWallet = available) }
     }
 
     fun saveDraft() {
-        val draft = _uiState.value.draft
+        val state = _uiState.value
+        val draft = state.draft
         if (draft.name.isBlank()) {
-            _uiState.update { it.copy(statusMessage = "Preencha pelo menos o nome do cartão.") }
+            _uiState.update { it.copy(statusMessage = message(it.appLanguage, "need_name")) }
             return
         }
         viewModelScope.launch {
             store.saveCard(draft)
             _uiState.update {
                 it.copy(
-                    draft = CardDraft(hexColor = it.draft.hexColor),
-                    statusMessage = "Cartão salvo no app."
+                    draft = CardDraft(passColor = it.draft.passColor),
+                    statusMessage = message(it.appLanguage, "pass_saved")
                 )
             }
         }
@@ -98,7 +129,7 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
     fun deleteCard(id: String) {
         viewModelScope.launch {
             store.deleteCard(id)
-            _uiState.update { it.copy(statusMessage = "Cartão removido.") }
+            _uiState.update { it.copy(statusMessage = message(it.appLanguage, "pass_deleted")) }
         }
     }
 
@@ -106,7 +137,7 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
         val state = _uiState.value
         viewModelScope.launch {
             store.persistSettings(state.walletIssuerId, state.walletClassSuffix, state.walletBackendUrl)
-            _uiState.update { it.copy(statusMessage = "Configuração do Google Wallet salva.") }
+            _uiState.update { it.copy(statusMessage = message(it.appLanguage, "wallet_saved")) }
         }
     }
 
@@ -114,13 +145,18 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
         val state = _uiState.value
         if (state.walletIssuerId.isBlank() || state.walletBackendUrl.isBlank()) {
             _uiState.update {
-                it.copy(statusMessage = "Configure o issuerId e a URL do backend que assina o JWT do Google Wallet.")
+                it.copy(statusMessage = message(it.appLanguage, "wallet_missing"))
             }
             return
         }
 
         viewModelScope.launch {
-            _uiState.update { it.copy(isSavingToWallet = true, statusMessage = "Gerando passe para o Google Wallet...") }
+            _uiState.update {
+                it.copy(
+                    isSavingToWallet = true,
+                    statusMessage = message(it.appLanguage, "wallet_generating")
+                )
+            }
             val payload = WalletPassBuilder.buildUnsignedPayload(
                 issuerId = state.walletIssuerId,
                 classSuffix = state.walletClassSuffix.ifBlank { "visitas_card" },
@@ -128,13 +164,18 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
             )
             val result = walletJwtClient.fetchSignedJwt(state.walletBackendUrl, payload)
             result.onSuccess { jwt ->
-                _uiState.update { it.copy(isSavingToWallet = false, statusMessage = "JWT assinado recebido. Abrindo Google Wallet...") }
+                _uiState.update {
+                    it.copy(
+                        isSavingToWallet = false,
+                        statusMessage = message(it.appLanguage, "wallet_opening")
+                    )
+                }
                 onReady(jwt)
             }.onFailure { error ->
                 _uiState.update {
                     it.copy(
                         isSavingToWallet = false,
-                        statusMessage = error.message ?: "Falha ao criar o JWT do Google Wallet."
+                        statusMessage = error.message ?: message(it.appLanguage, "wallet_failed")
                     )
                 }
             }
@@ -143,5 +184,70 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
 
     fun onWalletSaveResult(message: String) {
         _uiState.update { it.copy(statusMessage = message, isSavingToWallet = false) }
+    }
+
+    private fun message(language: AppLanguage, key: String, arg: String = ""): String {
+        return when (language) {
+            AppLanguage.PT_BR -> when (key) {
+                "create_intro" -> "Crie um passe, salve no app e depois envie para o Google Wallet."
+                "editing" -> "Editando $arg."
+                "draft_cleared" -> "Campo de criação limpo."
+                "photo_added" -> "Foto adicionada ao passe."
+                "language_changed" -> "Idioma atualizado."
+                "need_name" -> "Preencha pelo menos o nome do passe."
+                "pass_saved" -> "Passe salvo no app."
+                "pass_deleted" -> "Passe removido."
+                "wallet_saved" -> "Configuração do Google Wallet salva."
+                "wallet_missing" -> "Configure o issuer ID e a URL do backend que assina o JWT do Google Wallet."
+                "wallet_generating" -> "Gerando passe para o Google Wallet..."
+                "wallet_opening" -> "JWT assinado recebido. Abrindo Google Wallet..."
+                else -> "Falha ao criar o JWT do Google Wallet."
+            }
+            AppLanguage.PT_PT, AppLanguage.PT_AO -> when (key) {
+                "create_intro" -> "Crie um passe, guarde na aplicação e depois envie para o Google Wallet."
+                "editing" -> "A editar $arg."
+                "draft_cleared" -> "Campo de criação limpo."
+                "photo_added" -> "Fotografia adicionada ao passe."
+                "language_changed" -> "Idioma atualizado."
+                "need_name" -> "Preencha pelo menos o nome do passe."
+                "pass_saved" -> "Passe guardado na aplicação."
+                "pass_deleted" -> "Passe removido."
+                "wallet_saved" -> "Configuração do Google Wallet guardada."
+                "wallet_missing" -> "Configure o issuer ID e o URL do backend que assina o JWT do Google Wallet."
+                "wallet_generating" -> "A gerar passe para o Google Wallet..."
+                "wallet_opening" -> "JWT assinado recebido. A abrir o Google Wallet..."
+                else -> "Falha ao criar o JWT do Google Wallet."
+            }
+            AppLanguage.EN -> when (key) {
+                "create_intro" -> "Create a pass, save it in the app, then send it to Google Wallet."
+                "editing" -> "Editing $arg."
+                "draft_cleared" -> "Create form cleared."
+                "photo_added" -> "Photo added to the pass."
+                "language_changed" -> "Language updated."
+                "need_name" -> "Fill in at least the pass name."
+                "pass_saved" -> "Pass saved in the app."
+                "pass_deleted" -> "Pass removed."
+                "wallet_saved" -> "Google Wallet settings saved."
+                "wallet_missing" -> "Set the issuer ID and backend URL that signs the Google Wallet JWT."
+                "wallet_generating" -> "Generating pass for Google Wallet..."
+                "wallet_opening" -> "Signed JWT received. Opening Google Wallet..."
+                else -> "Failed to create the Google Wallet JWT."
+            }
+            AppLanguage.ZH -> when (key) {
+                "create_intro" -> "创建通行证，保存到应用中，然后发送到 Google Wallet。"
+                "editing" -> "正在编辑 $arg。"
+                "draft_cleared" -> "创建表单已清空。"
+                "photo_added" -> "照片已添加到通行证。"
+                "language_changed" -> "语言已更新。"
+                "need_name" -> "请至少填写通行证名称。"
+                "pass_saved" -> "通行证已保存在应用中。"
+                "pass_deleted" -> "通行证已删除。"
+                "wallet_saved" -> "Google Wallet 设置已保存。"
+                "wallet_missing" -> "请配置 issuer ID 和用于签名 Google Wallet JWT 的后端地址。"
+                "wallet_generating" -> "正在为 Google Wallet 生成通行证..."
+                "wallet_opening" -> "已收到签名 JWT，正在打开 Google Wallet..."
+                else -> "创建 Google Wallet JWT 失败。"
+            }
+        }
     }
 }

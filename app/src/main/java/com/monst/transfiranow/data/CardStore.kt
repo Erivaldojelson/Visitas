@@ -18,13 +18,15 @@ class CardStore(private val context: Context) {
     private val issuerKey = stringPreferencesKey("wallet_issuer_id")
     private val classSuffixKey = stringPreferencesKey("wallet_class_suffix")
     private val backendUrlKey = stringPreferencesKey("wallet_backend_url")
+    private val languageKey = stringPreferencesKey("app_language")
 
     val uiStateFlow: Flow<CardsUiState> = context.dataStore.data.map { preferences ->
         CardsUiState(
             cards = parseCards(preferences[cardsKey].orEmpty()),
             walletIssuerId = preferences[issuerKey].orEmpty(),
             walletClassSuffix = preferences[classSuffixKey] ?: "visitas_card",
-            walletBackendUrl = preferences[backendUrlKey].orEmpty()
+            walletBackendUrl = preferences[backendUrlKey].orEmpty(),
+            appLanguage = AppLanguage.fromCode(preferences[languageKey].orEmpty())
         )
     }
 
@@ -41,10 +43,13 @@ class CardStore(private val context: Context) {
             linkedin = draft.linkedin.trim(),
             website = draft.website.trim(),
             note = draft.note.trim(),
-            hexColor = draft.hexColor
+            photoUri = draft.photoUri.trim(),
+            walletPhotoUrl = draft.walletPhotoUrl.trim(),
+            passColor = draft.passColor,
+            updatedAt = System.currentTimeMillis()
         )
         val updated = existing.filterNot { it.id == id } + card
-        persistCards(updated.sortedBy { it.name.lowercase() })
+        persistCards(updated.sortedByDescending { it.updatedAt })
     }
 
     suspend fun deleteCard(id: String) {
@@ -57,6 +62,12 @@ class CardStore(private val context: Context) {
             preferences[issuerKey] = issuerId.trim()
             preferences[classSuffixKey] = classSuffix.trim().ifBlank { "visitas_card" }
             preferences[backendUrlKey] = backendUrl.trim()
+        }
+    }
+
+    suspend fun persistLanguage(language: AppLanguage) {
+        context.dataStore.edit { preferences ->
+            preferences[languageKey] = language.code
         }
     }
 
@@ -82,7 +93,10 @@ class CardStore(private val context: Context) {
                         .put("linkedin", card.linkedin)
                         .put("website", card.website)
                         .put("note", card.note)
-                        .put("hexColor", card.hexColor)
+                        .put("photoUri", card.photoUri)
+                        .put("walletPhotoUrl", card.walletPhotoUrl)
+                        .put("passColor", card.passColor)
+                        .put("updatedAt", card.updatedAt)
                 )
             }
             preferences[cardsKey] = json.toString()
@@ -107,11 +121,14 @@ class CardStore(private val context: Context) {
                             linkedin = item.optString("linkedin"),
                             website = item.optString("website"),
                             note = item.optString("note"),
-                            hexColor = item.optString("hexColor", "#1E3A8A")
+                            photoUri = item.optString("photoUri"),
+                            walletPhotoUrl = item.optString("walletPhotoUrl"),
+                            passColor = item.optString("passColor", item.optString("hexColor", "#1E3A8A")),
+                            updatedAt = item.optLong("updatedAt", 0L)
                         )
                     )
                 }
             }
-        }.getOrDefault(emptyList())
+        }.getOrDefault(emptyList()).sortedByDescending { it.updatedAt }
     }
 }

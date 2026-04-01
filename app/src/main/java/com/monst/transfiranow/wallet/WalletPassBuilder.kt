@@ -32,7 +32,7 @@ object WalletPassBuilder {
         val genericObject = JSONObject()
             .put("id", objectId)
             .put("classId", classId)
-            .put("hexBackgroundColor", card.hexColor)
+            .put("hexBackgroundColor", card.passColor)
             .put("cardTitle", localized(card.name))
             .put("subheader", localized(card.role.ifBlank { "Cartão pessoal" }))
             .put("header", localized(card.phone.ifBlank { card.email.ifBlank { "Contato" } }))
@@ -47,6 +47,11 @@ object WalletPassBuilder {
                 ).forEach { put(it) }
             })
             .put("linksModuleData", JSONObject().put("uris", links))
+
+        image(card.walletPhotoUrl)?.let { image ->
+            genericObject.put("heroImage", image)
+            genericObject.put("logo", image)
+        }
 
         return JSONObject()
             .put("iss", "backend-signs-this")
@@ -72,6 +77,14 @@ object WalletPassBuilder {
         return JSONObject()
             .put("description", localized(label))
             .put("uri", url)
+    }
+
+    private fun image(url: String): JSONObject? {
+        if (url.isBlank()) return null
+        return JSONObject().put(
+            "sourceUri",
+            JSONObject().put("uri", url)
+        )
     }
 
     private fun normalizeUrl(handleOrUrl: String, prefix: String): String {
