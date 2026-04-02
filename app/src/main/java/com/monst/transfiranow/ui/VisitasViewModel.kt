@@ -1,6 +1,11 @@
 package com.monst.transfiranow.ui
 
 import android.app.Application
+import android.content.ContentResolver
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
+import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.monst.transfiranow.data.AppLanguage
@@ -10,6 +15,11 @@ import com.monst.transfiranow.data.CardsUiState
 import com.monst.transfiranow.data.VisitingCard
 import com.monst.transfiranow.wallet.WalletJwtClient
 import com.monst.transfiranow.wallet.WalletPassBuilder
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.BinaryBitmap
+import com.google.zxing.MultiFormatReader
+import com.google.zxing.common.HybridBinarizer
+import com.google.zxing.RGBLuminanceSource
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -99,6 +109,25 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
                 statusMessage = message(it.appLanguage, "qr_cleared")
             )
         }
+    }
+
+    fun updateDraftQrFromImage(contentResolver: ContentResolver, uri: Uri) {
+        val bitmap = runCatching {
+            contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) }
+        }.getOrNull()
+
+        if (bitmap == null) {
+            Toast.makeText(getApplication(), "Não foi possível ler a imagem do QR Code.", Toast.LENGTH_LONG).show()
+            return
+        }
+
+        val decoded = decodeQrFromBitmap(bitmap)
+        if (decoded == null) {
+            Toast.makeText(getApplication(), "A imagem selecionada não parece ser um QR Code válido.", Toast.LENGTH_LONG).show()
+            return
+        }
+
+        updateDraftQrValue(decoded)
     }
 
     fun updateWalletSettings(issuerId: String? = null, classSuffix: String? = null, backendUrl: String? = null) {
@@ -277,4 +306,21 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
             }
         }
     }
+}
+
+private fun decodeQrFromBitmap(bitmap: Bitmap): String? {
+    val input = if (bitmap.config == Bitmap.Config.ARGB_8888) bitmap else bitmap.copy(Bitmap.Config.ARGB_8888, false)
+    val width = input.width
+    val height = input.height
+    val pixels = IntArray(width * height)
+    input.getPixels(pixels, 0, width, 0, 0, width, height)
+
+    val source = RGBLuminanceSource(width, height, pixels)
+    val binary = BinaryBitmap(HybridBinarizer(source))
+
+    return runCatching {
+        val result = MultiFormatReader().decode(binary)
+        if (result.barcodeFormat != BarcodeFormat.QR_CODE) return@runCatching null
+        result.text
+    }.getOrNull()
 }

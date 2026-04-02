@@ -64,6 +64,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -75,6 +76,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
+import android.content.Intent
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.MultiFormatWriter
@@ -82,6 +84,7 @@ import com.monst.transfiranow.BuildConfig
 import com.monst.transfiranow.data.AppLanguage
 import com.monst.transfiranow.data.CardDraft
 import com.monst.transfiranow.data.VisitingCard
+import com.monst.transfiranow.premium.PremiumCardsActivity
 import com.monst.transfiranow.ui.theme.TransfiraNowTheme
 
 private enum class AppTab { HOME, CREATE, SAVED, SETTINGS }
@@ -237,6 +240,7 @@ private fun EditorCard(
 
 @Composable
 private fun SettingsScreen(padding: PaddingValues, currentLanguage: AppLanguage, canUseGoogleWallet: Boolean, walletIssuerId: String, walletClassSuffix: String, walletBackendUrl: String, t: (String) -> String, onLanguageSelected: (AppLanguage) -> Unit, onWalletSettingsChange: (String?, String?, String?) -> Unit, onPersistWalletSettings: () -> Unit) {
+    val context = LocalContext.current
     LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 120.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
         item { Hero(t("settings_head"), t("settings_sub"), "${t("version")}: ${BuildConfig.VERSION_NAME}") }
         item {
@@ -245,6 +249,17 @@ private fun SettingsScreen(padding: PaddingValues, currentLanguage: AppLanguage,
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) { Icon(Icons.Rounded.Language, null); Text(t("language"), style = MaterialTheme.typography.titleLarge) }
                     listOf(AppLanguage.PT_BR to "Português (Brasil)", AppLanguage.PT_PT to "Português (Portugal)", AppLanguage.PT_AO to "Português (Angola)", AppLanguage.EN to "English", AppLanguage.ZH to "中文").forEach { (lang, label) ->
                         FilterChip(selected = currentLanguage == lang, onClick = { onLanguageSelected(lang) }, label = { Text(label) })
+                    }
+                }
+            }
+        }
+        item {
+            ElevatedCard(shape = RoundedCornerShape(28.dp)) {
+                Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("UI", style = MaterialTheme.typography.titleLarge)
+                    Text(t("premium_ui_hint"), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    FilledTonalButton(onClick = { context.startActivity(Intent(context, PremiumCardsActivity::class.java)) }) {
+                        Text(t("premium_ui_open"))
                     }
                 }
             }
@@ -608,8 +623,9 @@ private fun generateQrBitmap(value: String): Bitmap? = runCatching {
 
 private fun tr(language: AppLanguage, key: String): String {
     val pt = mapOf("home" to "Home", "create" to "Criar", "saved" to "Salvos", "settings" to "Config.", "home_head" to "10 cartões recentes", "home_sub" to "A tela inicial mostra até dez cartões recentes.", "home_empty_title" to "Sem cartões recentes", "home_empty_body" to "Crie um passe para vê-lo aqui.", "create_head" to "Criar cartão", "create_sub" to "Abra o campo criar e monte o passe.", "create_hint" to "Personalize apenas a cor do passe.", "saved_head" to "Todos os cartões salvos", "saved_sub" to "Aqui ficam todos os cartões guardados.", "saved_count" to "cartões salvos", "saved_empty_title" to "Sem cartões salvos", "saved_empty_body" to "Os cartões criados aparecem aqui.", "settings_head" to "Configurações", "settings_sub" to "Versão, GitHub, idioma e Google Wallet.", "version" to "Versão", "github" to "Minha conta do GitHub", "language" to "Idioma do app", "open_create" to "Abrir criar", "edit" to "Editar", "delete" to "Excluir", "pass" to "Passe", "add_photo" to "Adicionar foto", "change_photo" to "Trocar foto", "photo_hint" to "A foto fica salva no app. Para aparecer no Google Wallet, use uma URL pública.", "name" to "Nome", "role" to "Cargo", "phone" to "Celular", "email" to "Email", "instagram" to "Instagram", "linkedin" to "LinkedIn", "url" to "URL", "note" to "Nota", "qr_code" to "QR code", "wallet_photo" to "URL pública da foto para o Wallet", "pass_color" to "Cor do passe", "create_pass" to "Criar passe", "clear" to "Limpar", "wallet" to "Google Wallet", "wallet_on" to "Google Wallet disponível neste aparelho.", "wallet_off" to "Google Wallet indisponível ou não elegível neste aparelho.", "backend" to "URL do backend JWT", "wallet_save" to "Salvar configuração do Wallet", "wallet_add" to "Salvar no Wallet")
-    val pt2 = pt + mapOf("qr_pick" to "Selecionar imagem de QR Code", "qr_change" to "Trocar QR", "qr_remove" to "Remover QR")
+    val pt2 = pt + mapOf("qr_pick" to "Selecionar imagem de QR Code", "qr_change" to "Trocar QR", "qr_remove" to "Remover QR", "premium_ui_open" to "Abrir UI Premium", "premium_ui_hint" to "Nova interface com estilo premium (Apple + Material You).")
     val en = mapOf("home" to "Home", "create" to "Create", "saved" to "Saved", "settings" to "Settings", "home_head" to "10 recent cards", "home_sub" to "The home screen shows up to ten recent cards.", "home_empty_title" to "No recent cards", "home_empty_body" to "Create a pass to see it here.", "create_head" to "Create card", "create_sub" to "Open the create area and build the pass.", "create_hint" to "Only customize the pass color.", "saved_head" to "All saved cards", "saved_sub" to "Every saved card appears here.", "saved_count" to "saved cards", "saved_empty_title" to "No saved cards", "saved_empty_body" to "Created cards appear here.", "settings_head" to "Settings", "settings_sub" to "Version, GitHub, language and Google Wallet.", "version" to "Version", "github" to "My GitHub account", "language" to "App language", "open_create" to "Open create", "edit" to "Edit", "delete" to "Delete", "pass" to "Pass", "add_photo" to "Add photo", "change_photo" to "Change photo", "photo_hint" to "The photo is saved in the app. To show in Google Wallet, use a public image URL.", "name" to "Name", "role" to "Role", "phone" to "Phone", "email" to "Email", "instagram" to "Instagram", "linkedin" to "LinkedIn", "url" to "URL", "note" to "Note", "qr_code" to "QR code", "wallet_photo" to "Public photo URL for Wallet", "pass_color" to "Pass color", "create_pass" to "Create pass", "clear" to "Clear", "wallet" to "Google Wallet", "wallet_on" to "Google Wallet is available on this device.", "wallet_off" to "Google Wallet is unavailable or not eligible on this device.", "backend" to "JWT backend URL", "wallet_save" to "Save Wallet settings", "wallet_add" to "Save to Wallet", "qr_pick" to "Select QR Code image", "qr_change" to "Change QR", "qr_remove" to "Remove QR")
-    val zh = mapOf("home" to "首页", "create" to "创建", "saved" to "已保存", "settings" to "设置", "home_head" to "最近 10 张卡片", "home_sub" to "首页最多显示十张最近卡片。", "home_empty_title" to "没有最近卡片", "home_empty_body" to "创建通行证后会显示在这里。", "create_head" to "创建卡片", "create_sub" to "打开创建区域并制作通行证。", "create_hint" to "只允许自定义通行证颜色。", "saved_head" to "所有已保存卡片", "saved_sub" to "所有保存的卡片都在这里。", "saved_count" to "张已保存卡片", "saved_empty_title" to "没有已保存卡片", "saved_empty_body" to "已创建的卡片会显示在这里。", "settings_head" to "设置", "settings_sub" to "版本、GitHub、语言和 Google Wallet。", "version" to "版本", "github" to "我的 GitHub 账号", "language" to "应用语言", "open_create" to "打开创建", "edit" to "编辑", "delete" to "删除", "pass" to "通行证", "add_photo" to "添加照片", "change_photo" to "更换照片", "photo_hint" to "照片会保存在应用中。若要显示在 Google Wallet 中，请使用公开图片链接。", "name" to "姓名", "role" to "职位", "phone" to "手机", "email" to "邮箱", "instagram" to "Instagram", "linkedin" to "LinkedIn", "url" to "链接", "note" to "备注", "qr_code" to "二维码", "wallet_photo" to "Wallet 公开照片链接", "pass_color" to "通行证颜色", "create_pass" to "创建通行证", "clear" to "清空", "wallet" to "Google Wallet", "wallet_on" to "此设备支持 Google Wallet。", "wallet_off" to "此设备不支持 Google Wallet。", "backend" to "JWT 后端地址", "wallet_save" to "保存 Wallet 设置", "wallet_add" to "保存到 Wallet", "qr_pick" to "选择二维码图片", "qr_change" to "更换二维码", "qr_remove" to "移除二维码")
-    return when (language) { AppLanguage.EN -> en[key] ?: key; AppLanguage.ZH -> zh[key] ?: key; else -> pt2[key] ?: key }
+    val en2 = en + mapOf("premium_ui_open" to "Open Premium UI", "premium_ui_hint" to "New premium interface (Apple + Material You).")
+    val zh = mapOf("home" to "首页", "create" to "创建", "saved" to "已保存", "settings" to "设置", "home_head" to "最近 10 张卡片", "home_sub" to "首页最多显示十张最近卡片。", "home_empty_title" to "没有最近卡片", "home_empty_body" to "创建通行证后会显示在这里。", "create_head" to "创建卡片", "create_sub" to "打开创建区域并制作通行证。", "create_hint" to "只允许自定义通行证颜色。", "saved_head" to "所有已保存卡片", "saved_sub" to "所有保存的卡片都在这里。", "saved_count" to "张已保存卡片", "saved_empty_title" to "没有已保存卡片", "saved_empty_body" to "已创建的卡片会显示在这里。", "settings_head" to "设置", "settings_sub" to "版本、GitHub、语言和 Google Wallet。", "version" to "版本", "github" to "我的 GitHub 账号", "language" to "应用语言", "open_create" to "打开创建", "edit" to "编辑", "delete" to "删除", "pass" to "通行证", "add_photo" to "添加照片", "change_photo" to "更换照片", "photo_hint" to "照片会保存在应用中。若要显示在 Google Wallet 中，请使用公开图片链接。", "name" to "姓名", "role" to "职位", "phone" to "手机", "email" to "邮箱", "instagram" to "Instagram", "linkedin" to "LinkedIn", "url" to "链接", "note" to "备注", "qr_code" to "二维码", "wallet_photo" to "Wallet 公开照片链接", "pass_color" to "通行证颜色", "create_pass" to "创建通行证", "clear" to "清空", "wallet" to "Google Wallet", "wallet_on" to "此设备支持 Google Wallet。", "wallet_off" to "此设备不支持 Google Wallet。", "backend" to "JWT 后端地址", "wallet_save" to "保存 Wallet 设置", "wallet_add" to "保存到 Wallet", "qr_pick" to "选择二维码图片", "qr_change" to "更换二维码", "qr_remove" to "移除二维码", "premium_ui_open" to "打开高级界面", "premium_ui_hint" to "新界面（Apple + Material You）。")
+    return when (language) { AppLanguage.EN -> en2[key] ?: key; AppLanguage.ZH -> zh[key] ?: key; else -> pt2[key] ?: key }
 }
