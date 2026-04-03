@@ -10,6 +10,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
@@ -57,6 +58,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -110,7 +112,7 @@ fun VisitasApp(
             bottomBar = { PillBar(tab, t) { tab = it } }
         ) { padding ->
             when (tab) {
-                AppTab.HOME -> CardsScreen(padding, t("home_head"), t("home_sub"), uiState.statusMessage, uiState.cards.take(10), t, false, onSaveToWallet, {}) {
+                AppTab.HOME -> CardsScreen(padding, t("home_head"), "", "", uiState.cards.take(10), t, false, onSaveToWallet, {}) {
                     viewModel.editCard(it); tab = AppTab.CREATE
                 }
                 AppTab.CREATE -> CreateScreen(padding, uiState.draft, uiState.canUseGoogleWallet, uiState.walletIssuerId, uiState.walletClassSuffix, uiState.walletBackendUrl, t, onPickPhoto, onPickQrCode, viewModel::updateDraft, viewModel::updateWalletSettings, viewModel::saveDraft, viewModel::persistWalletSettings, viewModel::clearDraft, viewModel::clearDraftQr)
@@ -183,23 +185,201 @@ private fun CreateScreen(
     onClearQr: () -> Unit
 ) {
     LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 120.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-        item { Hero(t("create_head"), t("create_sub"), t("create_hint")) }
-        item { DraftPreview(draft, t("pass"), t) }
         item {
-            ElevatedCard(shape = RoundedCornerShape(28.dp)) {
-                Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                        PhotoBubble(draft.photoUri, parseColor(draft.passColor), Modifier.size(84.dp))
-                        FilledTonalButton(onClick = onPickPhoto) { Icon(Icons.Rounded.AddPhotoAlternate, null); Spacer(Modifier.width(8.dp)); Text(if (draft.photoUri.isBlank()) t("add_photo") else t("change_photo")) }
+            CreateInvitesEditorCard(
+                draft = draft,
+                canUseGoogleWallet = canUseGoogleWallet,
+                walletIssuerId = walletIssuerId,
+                walletClassSuffix = walletClassSuffix,
+                walletBackendUrl = walletBackendUrl,
+                t = t,
+                onPickPhoto = onPickPhoto,
+                onPickQrCode = onPickQrCode,
+                onDraftChange = onDraftChange,
+                onWalletSettingsChange = onWalletSettingsChange,
+                onCreatePass = onCreatePass,
+                onPersistWalletSettings = onPersistWalletSettings,
+                onClearDraft = onClearDraft,
+                onClearQr = onClearQr
+            )
+        }
+    }
+}
+
+@Composable
+private fun CreateInvitesEditorCard(
+    draft: CardDraft,
+    canUseGoogleWallet: Boolean,
+    walletIssuerId: String,
+    walletClassSuffix: String,
+    walletBackendUrl: String,
+    t: (String) -> String,
+    onPickPhoto: () -> Unit,
+    onPickQrCode: () -> Unit,
+    onDraftChange: ((CardDraft) -> CardDraft) -> Unit,
+    onWalletSettingsChange: (String?, String?, String?) -> Unit,
+    onCreatePass: () -> Unit,
+    onPersistWalletSettings: () -> Unit,
+    onClearDraft: () -> Unit,
+    onClearQr: () -> Unit
+) {
+    val accentColor = parseColor(draft.passColor)
+    var preview by rememberSaveable { mutableStateOf(false) }
+
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth().animateContentSize(),
+        shape = RoundedCornerShape(36.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+    ) {
+        Box(modifier = Modifier.fillMaxWidth()) {
+            if (draft.photoUri.isNotBlank()) {
+                AsyncImage(
+                    model = draft.photoUri,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.matchParentSize()
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(
+                            Brush.linearGradient(
+                                listOf(
+                                    accentColor.copy(alpha = 0.95f),
+                                    accentColor.copy(alpha = 0.55f),
+                                    MaterialTheme.colorScheme.surfaceContainerHigh
+                                )
+                            )
+                        )
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                Color.Black.copy(alpha = 0.10f),
+                                Color.Transparent,
+                                Color.Black.copy(alpha = 0.80f)
+                            )
+                        )
+                    )
+            )
+
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(color = Color.Black.copy(alpha = 0.28f), shape = RoundedCornerShape(999.dp)) {
+                        TextButton(onClick = { preview = !preview }) {
+                            Text(if (preview) "Editar" else "Preview", color = Color.White, fontWeight = FontWeight.SemiBold)
+                        }
                     }
-                    Text(t("photo_hint"), color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+                    Surface(color = Color.Black.copy(alpha = 0.28f), shape = RoundedCornerShape(999.dp)) {
+                        TextButton(onClick = onPickPhoto) {
+                            Icon(Icons.Rounded.AddPhotoAlternate, contentDescription = null, tint = Color.White)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Editar fundo", color = Color.White, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
+
+                if (preview) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(28.dp),
+                        color = Color.Black.copy(alpha = 0.22f)
+                    ) {
+                        Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            DraftPreview(draft, t("pass"), t)
+                            Text(t("create_hint"), color = Color.White.copy(alpha = 0.85f), textAlign = TextAlign.Center)
+                        }
+                    }
+                    return@Column
+                }
+
+                Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), color = Color.Black.copy(alpha = 0.22f)) {
+                    Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        FrostedField(draft.name, t("name")) { onDraftChange { d -> d.copy(name = it) } }
+                        FrostedField(draft.role, t("role")) { onDraftChange { d -> d.copy(role = it) } }
+                        FrostedField(draft.phone, t("phone")) { onDraftChange { d -> d.copy(phone = it) } }
+                        FrostedField(draft.email, t("email")) { onDraftChange { d -> d.copy(email = it) } }
+                        FrostedField(draft.instagram, t("instagram")) { onDraftChange { d -> d.copy(instagram = it) } }
+                        FrostedField(draft.linkedin, t("linkedin")) { onDraftChange { d -> d.copy(linkedin = it) } }
+                        FrostedField(draft.website, t("url")) { onDraftChange { d -> d.copy(website = it) } }
+                        FrostedField(draft.note, t("note"), singleLine = false) { onDraftChange { d -> d.copy(note = it) } }
+                        FrostedField(draft.walletPhotoUrl, t("wallet_photo"), singleLine = false) { onDraftChange { d -> d.copy(walletPhotoUrl = it) } }
+                    }
+                }
+
+                Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), color = Color.Black.copy(alpha = 0.22f)) {
+                    Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(t("qr_code"), color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        if (draft.qrValue.isBlank()) {
+                            FilledTonalButton(onClick = onPickQrCode) { Text(t("qr_pick")) }
+                        } else {
+                            QrCodeCard(value = draft.qrValue, label = t("qr_code"), showValueText = false)
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                FilledTonalButton(onClick = onPickQrCode) { Text(t("qr_change")) }
+                                TextButton(onClick = onClearQr) { Text(t("qr_remove"), color = Color.White) }
+                            }
+                        }
+                    }
+                }
+
+                Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), color = Color.Black.copy(alpha = 0.22f)) {
+                    Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(t("pass_color"), color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        ColorPicker(draft.passColor) { color -> onDraftChange { d -> d.copy(passColor = color) } }
+                    }
+                }
+
+                WalletCard(canUseGoogleWallet, walletIssuerId, walletClassSuffix, walletBackendUrl, t, onWalletSettingsChange, onPersistWalletSettings)
+
+                Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), color = Color.Black.copy(alpha = 0.22f)) {
+                    Row(Modifier.fillMaxWidth().padding(14.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Button(onClick = onCreatePass, modifier = Modifier.weight(1f)) {
+                            Icon(Icons.Rounded.Save, null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(t("create_pass"))
+                        }
+                        TextButton(onClick = onClearDraft) { Text(t("clear"), color = Color.White) }
+                    }
                 }
             }
         }
-        item {
-            EditorCard(draft, canUseGoogleWallet, walletIssuerId, walletClassSuffix, walletBackendUrl, t, onPickQrCode, onDraftChange, onWalletSettingsChange, onCreatePass, onPersistWalletSettings, onClearDraft, onClearQr)
-        }
     }
+}
+
+@Composable
+private fun FrostedField(value: String, label: String, singleLine: Boolean = true, onChange: (String) -> Unit) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onChange,
+        label = { Text(label) },
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = singleLine,
+        colors = TextFieldDefaults.colors(
+            focusedTextColor = Color.White,
+            unfocusedTextColor = Color.White,
+            focusedContainerColor = Color.White.copy(alpha = 0.10f),
+            unfocusedContainerColor = Color.White.copy(alpha = 0.08f),
+            focusedLabelColor = Color.White.copy(alpha = 0.85f),
+            unfocusedLabelColor = Color.White.copy(alpha = 0.70f),
+            focusedIndicatorColor = Color.White.copy(alpha = 0.55f),
+            unfocusedIndicatorColor = Color.White.copy(alpha = 0.30f),
+            cursorColor = Color.White
+        )
+    )
 }
 
 @Composable
@@ -361,75 +541,72 @@ private fun SavedPassCard(card: VisitingCard, t: (String) -> String, showDelete:
     var expanded by rememberSaveable(card.id) { mutableStateOf(false) }
 
     ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize()
+            .clickable { expanded = !expanded },
         shape = RoundedCornerShape(36.dp),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
     ) {
-        Column(Modifier.fillMaxWidth()) {
+        Box(modifier = Modifier.fillMaxWidth()) {
+            if (card.photoUri.isNotBlank()) {
+                AsyncImage(
+                    model = card.photoUri,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.matchParentSize()
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(
+                            Brush.linearGradient(
+                                listOf(
+                                    accentColor.copy(alpha = 0.95f),
+                                    accentColor.copy(alpha = 0.55f),
+                                    MaterialTheme.colorScheme.surfaceContainerHigh
+                                )
+                            )
+                        )
+                )
+            }
+
             Box(
                 modifier = Modifier
+                    .matchParentSize()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                Color.Black.copy(alpha = 0.10f),
+                                Color.Transparent,
+                                Color.Black.copy(alpha = 0.70f)
+                            )
+                        )
+                    )
+            )
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                Color.Transparent,
+                                accentColor.copy(alpha = 0.20f),
+                                accentColor.copy(alpha = 0.92f)
+                            )
+                        )
+                    )
+            )
+
+            Column(
+                modifier = Modifier
                     .fillMaxWidth()
-                    .height(292.dp)
-                    .clip(RoundedCornerShape(36.dp))
-                    .clickable { expanded = !expanded }
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                if (card.photoUri.isNotBlank()) {
-                    AsyncImage(
-                        model = card.photoUri,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                Brush.linearGradient(
-                                    listOf(
-                                        accentColor.copy(alpha = 0.95f),
-                                        accentColor.copy(alpha = 0.55f),
-                                        MaterialTheme.colorScheme.surfaceContainerHigh
-                                    )
-                                )
-                            )
-                    )
-                }
-
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(
-                                    Color.Black.copy(alpha = 0.10f),
-                                    Color.Transparent,
-                                    Color.Black.copy(alpha = 0.70f)
-                                )
-                            )
-                        )
-                )
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(
-                                    Color.Transparent,
-                                    accentColor.copy(alpha = 0.20f),
-                                    accentColor.copy(alpha = 0.92f)
-                                )
-                            )
-                        )
-                )
-
-                Surface(
-                    color = Color.Black.copy(alpha = 0.28f),
-                    shape = RoundedCornerShape(999.dp),
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(16.dp)
-                ) {
+                Surface(color = Color.Black.copy(alpha = 0.28f), shape = RoundedCornerShape(999.dp)) {
                     Text(
                         t("pass"),
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
@@ -439,91 +616,81 @@ private fun SavedPassCard(card: VisitingCard, t: (String) -> String, showDelete:
                     )
                 }
 
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(horizontal = 18.dp, vertical = 18.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    PhotoBubble(card.photoUri, accentColor, Modifier.size(44.dp))
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        card.name.ifBlank { "Sem nome" },
-                        color = Color.White,
-                        style = MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        textAlign = TextAlign.Center,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        phone,
-                        color = Color.White.copy(alpha = 0.90f),
-                        style = MaterialTheme.typography.bodyLarge,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        email,
-                        color = Color.White.copy(alpha = 0.86f),
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
+                Spacer(Modifier.height(10.dp))
+                PhotoBubble(card.photoUri, accentColor, Modifier.size(48.dp))
+                Text(
+                    card.name.ifBlank { "Sem nome" },
+                    color = Color.White,
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    phone,
+                    color = Color.White.copy(alpha = 0.90f),
+                    style = MaterialTheme.typography.bodyLarge,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    email,
+                    color = Color.White.copy(alpha = 0.86f),
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
 
-            AnimatedVisibility(
-                visible = expanded,
-                enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
-                exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()
-            ) {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 12.dp),
-                    shape = RoundedCornerShape(28.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHighest
+                AnimatedVisibility(
+                    visible = expanded,
+                    enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
+                    exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()
                 ) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth().padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(28.dp),
+                        color = Color.Black.copy(alpha = 0.22f)
                     ) {
-                        allLines.forEach { (label, value) -> TicketLine(label, value) }
-                        if (card.qrValue.isNotBlank()) {
-                            Spacer(Modifier.height(6.dp))
-                            TicketQr(value = card.qrValue, label = t("qr_code"))
-                        } else {
-                            Spacer(Modifier.height(2.dp))
-                            TicketLine(t("qr_code"), "Sem QR code")
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            allLines.forEach { (label, value) -> TicketLine(label, value) }
+                            if (card.qrValue.isNotBlank()) {
+                                Spacer(Modifier.height(6.dp))
+                                TicketQr(value = card.qrValue, label = t("qr_code"))
+                            } else {
+                                Spacer(Modifier.height(2.dp))
+                                TicketLine(t("qr_code"), "Sem QR code")
+                            }
                         }
                     }
                 }
-            }
 
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(30.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerLow
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(30.dp),
+                    color = Color.Black.copy(alpha = 0.22f)
                 ) {
-                    FilledTonalButton(onClick = onEdit) {
-                        Icon(Icons.Rounded.Edit, null)
-                        Spacer(Modifier.width(8.dp))
-                        Text(t(if (showDelete) "edit" else "open_create"))
-                    }
-                    WalletActionButton(onClick = onSaveToWallet, label = t("wallet_add"), modifier = Modifier.weight(1f))
-                    if (showDelete) TextButton(onClick = onDelete) {
-                        Icon(Icons.Rounded.Delete, null)
-                        Spacer(Modifier.width(4.dp))
-                        Text(t("delete"))
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        FilledTonalButton(onClick = onEdit) {
+                            Icon(Icons.Rounded.Edit, null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(t(if (showDelete) "edit" else "open_create"))
+                        }
+                        WalletActionButton(onClick = onSaveToWallet, label = t("wallet_add"), modifier = Modifier.weight(1f))
+                        if (showDelete) TextButton(onClick = onDelete) {
+                            Icon(Icons.Rounded.Delete, null)
+                            Spacer(Modifier.width(4.dp))
+                            Text(t("delete"))
+                        }
                     }
                 }
             }
@@ -793,10 +960,10 @@ private fun generateQrBitmap(value: String): Bitmap? = runCatching {
 }.getOrNull()
 
 private fun tr(language: AppLanguage, key: String): String {
-    val pt = mapOf("home" to "Home", "create" to "Criar", "saved" to "Salvos", "settings" to "Config.", "home_head" to "Recentes", "home_sub" to "A tela inicial mostra até dez cartões recentes.", "home_empty_title" to "Sem cartões recentes", "home_empty_body" to "Crie um passe para vê-lo aqui.", "create_head" to "Criar cartão", "create_sub" to "Abra o campo criar e monte o passe.", "create_hint" to "Personalize apenas a cor do passe.", "saved_head" to "Todos os cartões salvos", "saved_sub" to "Aqui ficam todos os cartões guardados.", "saved_count" to "cartões salvos", "saved_empty_title" to "Sem cartões salvos", "saved_empty_body" to "Os cartões criados aparecem aqui.", "settings_head" to "Configurações", "settings_sub" to "Versão, GitHub, idioma e Google Wallet.", "version" to "Versão", "github" to "Minha conta do GitHub", "language" to "Idioma do app", "open_create" to "Abrir criar", "edit" to "Editar", "delete" to "Excluir", "pass" to "Passe", "add_photo" to "Adicionar foto", "change_photo" to "Trocar foto", "photo_hint" to "A foto fica salva no app. Para aparecer no Google Wallet, use uma URL pública.", "name" to "Nome", "role" to "Cargo", "phone" to "Celular", "email" to "Email", "instagram" to "Instagram", "linkedin" to "LinkedIn", "url" to "URL", "note" to "Nota", "qr_code" to "QR code", "wallet_photo" to "URL pública da foto para o Wallet", "pass_color" to "Cor do passe", "create_pass" to "Criar passe", "clear" to "Limpar", "wallet" to "Google Wallet", "wallet_on" to "Google Wallet disponível neste aparelho.", "wallet_off" to "Google Wallet indisponível ou não elegível neste aparelho.", "backend" to "URL do backend JWT", "wallet_save" to "Salvar configuração do Wallet", "wallet_add" to "Salvar no Wallet")
+    val pt = mapOf("home" to "Home", "create" to "Criar", "saved" to "Salvos", "settings" to "Config.", "home_head" to "Recentes", "home_sub" to "", "home_empty_title" to "Sem cartões recentes", "home_empty_body" to "Crie um passe para vê-lo aqui.", "create_head" to "Criar cartão", "create_sub" to "Abra o campo criar e monte o passe.", "create_hint" to "Personalize apenas a cor do passe.", "saved_head" to "Todos os cartões salvos", "saved_sub" to "Aqui ficam todos os cartões guardados.", "saved_count" to "cartões salvos", "saved_empty_title" to "Sem cartões salvos", "saved_empty_body" to "Os cartões criados aparecem aqui.", "settings_head" to "Configurações", "settings_sub" to "Versão, GitHub, idioma e Google Wallet.", "version" to "Versão", "github" to "Minha conta do GitHub", "language" to "Idioma do app", "open_create" to "Abrir criar", "edit" to "Editar", "delete" to "Excluir", "pass" to "Passe", "add_photo" to "Adicionar foto", "change_photo" to "Trocar foto", "photo_hint" to "A foto fica salva no app. Para aparecer no Google Wallet, use uma URL pública.", "name" to "Nome", "role" to "Cargo", "phone" to "Celular", "email" to "Email", "instagram" to "Instagram", "linkedin" to "LinkedIn", "url" to "URL", "note" to "Nota", "qr_code" to "QR code", "wallet_photo" to "URL pública da foto para o Wallet", "pass_color" to "Cor do passe", "create_pass" to "Criar passe", "clear" to "Limpar", "wallet" to "Google Wallet", "wallet_on" to "Google Wallet disponível neste aparelho.", "wallet_off" to "Google Wallet indisponível ou não elegível neste aparelho.", "backend" to "URL do backend JWT", "wallet_save" to "Salvar configuração do Wallet", "wallet_add" to "Salvar no Wallet")
     val pt2 = pt + mapOf("qr_pick" to "Selecionar imagem de QR Code", "qr_change" to "Trocar QR", "qr_remove" to "Remover QR", "premium_ui_open" to "Abrir UI Premium", "premium_ui_hint" to "Nova interface com estilo premium (Apple + Material You).")
-    val en = mapOf("home" to "Home", "create" to "Create", "saved" to "Saved", "settings" to "Settings", "home_head" to "Recents", "home_sub" to "The home screen shows up to ten recent cards.", "home_empty_title" to "No recent cards", "home_empty_body" to "Create a pass to see it here.", "create_head" to "Create card", "create_sub" to "Open the create area and build the pass.", "create_hint" to "Only customize the pass color.", "saved_head" to "All saved cards", "saved_sub" to "Every saved card appears here.", "saved_count" to "saved cards", "saved_empty_title" to "No saved cards", "saved_empty_body" to "Created cards appear here.", "settings_head" to "Settings", "settings_sub" to "Version, GitHub, language and Google Wallet.", "version" to "Version", "github" to "My GitHub account", "language" to "App language", "open_create" to "Open create", "edit" to "Edit", "delete" to "Delete", "pass" to "Pass", "add_photo" to "Add photo", "change_photo" to "Change photo", "photo_hint" to "The photo is saved in the app. To show in Google Wallet, use a public image URL.", "name" to "Name", "role" to "Role", "phone" to "Phone", "email" to "Email", "instagram" to "Instagram", "linkedin" to "LinkedIn", "url" to "URL", "note" to "Note", "qr_code" to "QR code", "wallet_photo" to "Public photo URL for Wallet", "pass_color" to "Pass color", "create_pass" to "Create pass", "clear" to "Clear", "wallet" to "Google Wallet", "wallet_on" to "Google Wallet is available on this device.", "wallet_off" to "Google Wallet is unavailable or not eligible on this device.", "backend" to "JWT backend URL", "wallet_save" to "Save Wallet settings", "wallet_add" to "Save to Wallet", "qr_pick" to "Select QR Code image", "qr_change" to "Change QR", "qr_remove" to "Remove QR")
+    val en = mapOf("home" to "Home", "create" to "Create", "saved" to "Saved", "settings" to "Settings", "home_head" to "Recents", "home_sub" to "", "home_empty_title" to "No recent cards", "home_empty_body" to "Create a pass to see it here.", "create_head" to "Create card", "create_sub" to "Open the create area and build the pass.", "create_hint" to "Only customize the pass color.", "saved_head" to "All saved cards", "saved_sub" to "Every saved card appears here.", "saved_count" to "saved cards", "saved_empty_title" to "No saved cards", "saved_empty_body" to "Created cards appear here.", "settings_head" to "Settings", "settings_sub" to "Version, GitHub, language and Google Wallet.", "version" to "Version", "github" to "My GitHub account", "language" to "App language", "open_create" to "Open create", "edit" to "Edit", "delete" to "Delete", "pass" to "Pass", "add_photo" to "Add photo", "change_photo" to "Change photo", "photo_hint" to "The photo is saved in the app. To show in Google Wallet, use a public image URL.", "name" to "Name", "role" to "Role", "phone" to "Phone", "email" to "Email", "instagram" to "Instagram", "linkedin" to "LinkedIn", "url" to "URL", "note" to "Note", "qr_code" to "QR code", "wallet_photo" to "Public photo URL for Wallet", "pass_color" to "Pass color", "create_pass" to "Create pass", "clear" to "Clear", "wallet" to "Google Wallet", "wallet_on" to "Google Wallet is available on this device.", "wallet_off" to "Google Wallet is unavailable or not eligible on this device.", "backend" to "JWT backend URL", "wallet_save" to "Save Wallet settings", "wallet_add" to "Save to Wallet", "qr_pick" to "Select QR Code image", "qr_change" to "Change QR", "qr_remove" to "Remove QR")
     val en2 = en + mapOf("premium_ui_open" to "Open Premium UI", "premium_ui_hint" to "New premium interface (Apple + Material You).")
-    val zh = mapOf("home" to "首页", "create" to "创建", "saved" to "已保存", "settings" to "设置", "home_head" to "最近", "home_sub" to "首页最多显示十张最近卡片。", "home_empty_title" to "没有最近卡片", "home_empty_body" to "创建通行证后会显示在这里。", "create_head" to "创建卡片", "create_sub" to "打开创建区域并制作通行证。", "create_hint" to "只允许自定义通行证颜色。", "saved_head" to "所有已保存卡片", "saved_sub" to "所有保存的卡片都在这里。", "saved_count" to "张已保存卡片", "saved_empty_title" to "没有已保存卡片", "saved_empty_body" to "已创建的卡片会显示在这里。", "settings_head" to "设置", "settings_sub" to "版本、GitHub、语言和 Google Wallet。", "version" to "版本", "github" to "我的 GitHub 账号", "language" to "应用语言", "open_create" to "打开创建", "edit" to "编辑", "delete" to "删除", "pass" to "通行证", "add_photo" to "添加照片", "change_photo" to "更换照片", "photo_hint" to "照片会保存在应用中。若要显示在 Google Wallet 中，请使用公开图片链接。", "name" to "姓名", "role" to "职位", "phone" to "手机", "email" to "邮箱", "instagram" to "Instagram", "linkedin" to "LinkedIn", "url" to "链接", "note" to "备注", "qr_code" to "二维码", "wallet_photo" to "Wallet 公开照片链接", "pass_color" to "通行证颜色", "create_pass" to "创建通行证", "clear" to "清空", "wallet" to "Google Wallet", "wallet_on" to "此设备支持 Google Wallet。", "wallet_off" to "此设备不支持 Google Wallet。", "backend" to "JWT 后端地址", "wallet_save" to "保存 Wallet 设置", "wallet_add" to "保存到 Wallet", "qr_pick" to "选择二维码图片", "qr_change" to "更换二维码", "qr_remove" to "移除二维码", "premium_ui_open" to "打开高级界面", "premium_ui_hint" to "新界面（Apple + Material You）。")
+    val zh = mapOf("home" to "首页", "create" to "创建", "saved" to "已保存", "settings" to "设置", "home_head" to "最近", "home_sub" to "", "home_empty_title" to "没有最近卡片", "home_empty_body" to "创建通行证后会显示在这里。", "create_head" to "创建卡片", "create_sub" to "打开创建区域并制作通行证。", "create_hint" to "只允许自定义通行证颜色。", "saved_head" to "所有已保存卡片", "saved_sub" to "所有保存的卡片都在这里。", "saved_count" to "张已保存卡片", "saved_empty_title" to "没有已保存卡片", "saved_empty_body" to "已创建的卡片会显示在这里。", "settings_head" to "设置", "settings_sub" to "版本、GitHub、语言和 Google Wallet。", "version" to "版本", "github" to "我的 GitHub 账号", "language" to "应用语言", "open_create" to "打开创建", "edit" to "编辑", "delete" to "删除", "pass" to "通行证", "add_photo" to "添加照片", "change_photo" to "更换照片", "photo_hint" to "照片会保存在应用中。若要显示在 Google Wallet 中，请使用公开图片链接。", "name" to "姓名", "role" to "职位", "phone" to "手机", "email" to "邮箱", "instagram" to "Instagram", "linkedin" to "LinkedIn", "url" to "链接", "note" to "备注", "qr_code" to "二维码", "wallet_photo" to "Wallet 公开照片链接", "pass_color" to "通行证颜色", "create_pass" to "创建通行证", "clear" to "清空", "wallet" to "Google Wallet", "wallet_on" to "此设备支持 Google Wallet。", "wallet_off" to "此设备不支持 Google Wallet。", "backend" to "JWT 后端地址", "wallet_save" to "保存 Wallet 设置", "wallet_add" to "保存到 Wallet", "qr_pick" to "选择二维码图片", "qr_change" to "更换二维码", "qr_remove" to "移除二维码", "premium_ui_open" to "打开高级界面", "premium_ui_hint" to "新界面（Apple + Material You）。")
     return when (language) { AppLanguage.EN -> en2[key] ?: key; AppLanguage.ZH -> zh[key] ?: key; else -> pt2[key] ?: key }
 }
