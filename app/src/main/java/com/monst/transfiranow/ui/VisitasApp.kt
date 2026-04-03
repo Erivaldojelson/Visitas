@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.net.Uri
 import android.widget.ImageView
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -347,8 +348,17 @@ private fun DraftPreview(draft: CardDraft, passLabel: String, t: (String) -> Str
 @Composable
 private fun SavedPassCard(card: VisitingCard, t: (String) -> String, showDelete: Boolean, onEdit: () -> Unit, onDelete: () -> Unit, onSaveToWallet: () -> Unit) {
     val accentColor = parseColor(card.passColor)
-    val subtitle = card.role.ifBlank { "-" }
-    val tertiary = card.website.ifBlank { "Sem URL" }
+    val phone = card.phone.ifBlank { "Sem telefone" }
+    val email = card.email.ifBlank { "Sem email" }
+    val allLines = listOf(
+        t("phone") to phone,
+        t("email") to email,
+        t("instagram") to card.instagram.ifBlank { "Sem Instagram" },
+        t("linkedin") to card.linkedin.ifBlank { "Sem LinkedIn" },
+        t("url") to card.website.ifBlank { "Sem URL" },
+        t("note") to card.note.ifBlank { "Sem nota" }
+    )
+    var expanded by rememberSaveable(card.id) { mutableStateOf(false) }
 
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
@@ -361,6 +371,7 @@ private fun SavedPassCard(card: VisitingCard, t: (String) -> String, showDelete:
                     .fillMaxWidth()
                     .height(292.dp)
                     .clip(RoundedCornerShape(36.dp))
+                    .clickable { expanded = !expanded }
             ) {
                 if (card.photoUri.isNotBlank()) {
                     AsyncImage(
@@ -447,7 +458,7 @@ private fun SavedPassCard(card: VisitingCard, t: (String) -> String, showDelete:
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        subtitle,
+                        phone,
                         color = Color.White.copy(alpha = 0.90f),
                         style = MaterialTheme.typography.bodyLarge,
                         textAlign = TextAlign.Center,
@@ -455,13 +466,41 @@ private fun SavedPassCard(card: VisitingCard, t: (String) -> String, showDelete:
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        tertiary,
-                        color = Color.White.copy(alpha = 0.82f),
+                        email,
+                        color = Color.White.copy(alpha = 0.86f),
                         style = MaterialTheme.typography.bodyMedium,
                         textAlign = TextAlign.Center,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                }
+            }
+
+            AnimatedVisibility(
+                visible = expanded,
+                enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
+                exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 12.dp),
+                    shape = RoundedCornerShape(28.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        allLines.forEach { (label, value) -> TicketLine(label, value) }
+                        if (card.qrValue.isNotBlank()) {
+                            Spacer(Modifier.height(6.dp))
+                            TicketQr(value = card.qrValue, label = t("qr_code"))
+                        } else {
+                            Spacer(Modifier.height(2.dp))
+                            TicketLine(t("qr_code"), "Sem QR code")
+                        }
+                    }
                 }
             }
 
