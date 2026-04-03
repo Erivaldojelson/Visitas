@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -38,6 +39,7 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.AddPhotoAlternate
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.EmojiEvents
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Person
@@ -67,16 +69,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
 import android.content.Intent
+import coil.compose.AsyncImage
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.MultiFormatWriter
@@ -144,7 +150,7 @@ private fun RowScope.PillItem(tab: AppTab, selected: AppTab, label: String, icon
 @Composable
 private fun CardsScreen(padding: PaddingValues, title: String, subtitle: String, message: String, cards: List<VisitingCard>, t: (String) -> String, showDelete: Boolean, onSaveToWallet: (VisitingCard) -> Unit, onDelete: (VisitingCard) -> Unit, onEdit: (VisitingCard) -> Unit) {
     LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 120.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-        item { Hero(title, subtitle, message) }
+        item { Hero(title, subtitle, message, cards) }
         if (cards.isEmpty()) item { EmptyCard(t(if (showDelete) "saved_empty_title" else "home_empty_title"), t(if (showDelete) "saved_empty_body" else "home_empty_body")) }
         else items(cards, key = { it.id }) { card -> SavedPassCard(card, t, showDelete, { onEdit(card) }, { onDelete(card) }, { onSaveToWallet(card) }) }
     }
@@ -278,13 +284,185 @@ private fun SettingsScreen(padding: PaddingValues, currentLanguage: AppLanguage,
     }
 }
 
-@Composable private fun Hero(title: String, subtitle: String, message: String) {
+@Composable
+private fun Hero(title: String, subtitle: String, message: String) {
     ElevatedCard(shape = RoundedCornerShape(36.dp), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
         Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Surface(shape = RoundedCornerShape(999.dp), color = MaterialTheme.colorScheme.secondaryContainer) { Text("Visitas", Modifier.padding(horizontal = 12.dp, vertical = 8.dp), color = MaterialTheme.colorScheme.onSecondaryContainer) }
             Text(title, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.SemiBold)
             Text(subtitle, style = MaterialTheme.typography.bodyLarge)
             Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+        }
+    }
+}
+
+@Composable
+private fun Hero(title: String, subtitle: String, message: String, cards: List<VisitingCard>) {
+    val heroImage = remember(cards) { cards.firstOrNull { it.photoUri.isNotBlank() }?.photoUri }
+    val avatarCards = remember(cards) { cards.take(10) }
+
+    ElevatedCard(
+        shape = RoundedCornerShape(36.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(292.dp)
+                .clip(RoundedCornerShape(36.dp))
+        ) {
+            if (!heroImage.isNullOrBlank()) {
+                AsyncImage(
+                    model = heroImage,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.linearGradient(
+                                listOf(
+                                    MaterialTheme.colorScheme.primaryContainer,
+                                    MaterialTheme.colorScheme.tertiaryContainer,
+                                    MaterialTheme.colorScheme.surfaceContainerHigh
+                                )
+                            )
+                        )
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                Color.Black.copy(alpha = 0.18f),
+                                Color.Transparent,
+                                Color.Black.copy(alpha = 0.65f)
+                            )
+                        )
+                    )
+            )
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                Color.Transparent,
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.90f)
+                            )
+                        )
+                    )
+            )
+
+            Surface(
+                color = Color.Black.copy(alpha = 0.28f),
+                shape = RoundedCornerShape(999.dp),
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(Icons.Rounded.EmojiEvents, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    Text("Visitas", color = Color.White, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                }
+            }
+
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(horizontal = 18.dp, vertical = 18.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                AvatarStack(cards = avatarCards, maxAvatars = 7)
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    title,
+                    color = Color.White,
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    subtitle,
+                    color = Color.White.copy(alpha = 0.90f),
+                    style = MaterialTheme.typography.bodyLarge,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    message,
+                    color = Color.White.copy(alpha = 0.85f),
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AvatarStack(cards: List<VisitingCard>, maxAvatars: Int, modifier: Modifier = Modifier) {
+    val shown = remember(cards) { cards.take(maxAvatars) }
+    val extraCount = (cards.size - shown.size).coerceAtLeast(0)
+    val avatarSize = 28.dp
+    val overlap = 10.dp
+
+    Box(modifier = modifier.height(avatarSize)) {
+        shown.forEachIndexed { index, card ->
+            val initial = remember(card.name) { card.name.trim().firstOrNull()?.uppercase() ?: "•" }
+            Box(
+                modifier = Modifier
+                    .offset(x = ((avatarSize - overlap) * index.toFloat()))
+                    .size(avatarSize)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.18f))
+                    .border(1.dp, Color.White.copy(alpha = 0.75f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                if (card.photoUri.isNotBlank()) {
+                    AsyncImage(
+                        model = card.photoUri,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Text(text = initial, color = Color.White, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+
+        if (extraCount > 0) {
+            val index = shown.size
+            Box(
+                modifier = Modifier
+                    .offset(x = ((avatarSize - overlap) * index.toFloat()))
+                    .size(avatarSize)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.30f))
+                    .border(1.dp, Color.White.copy(alpha = 0.75f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(text = "+$extraCount", color = Color.White, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+            }
         }
     }
 }
