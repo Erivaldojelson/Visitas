@@ -20,6 +20,10 @@ backend/node_modules/
 /package.json
 /package-lock.json
 
+# Backend runtime files
+backend/.env
+backend/data/
+
 # Local research / downloads
 wallet-android-codelab/
 

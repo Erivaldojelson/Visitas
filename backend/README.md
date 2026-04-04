@@ -1,27 +1,52 @@
-# Visitas Wallet Backend
+# Visitas Backend (Cards + Wallet)
 
-Backend minimo para assinar o JWT do Google Wallet usado pelo app `Visitas`.
+Backend para o app `Visitas` com:
 
-## O que ele faz
+- API de cartões (`/cards`) que gera um QR Code (base64 PNG) e retorna o payload usado pelo app Android
+- assinatura do JWT do Google Wallet (`/wallet/sign`) para o botão “Salvar no Google Wallet”
 
-- recebe um payload JSON do app Android
-- sobrescreve os claims principais do JWT
-- assina com a service account do Google Wallet
-- devolve:
+## Endpoints
 
-```json
-{ "jwt": "TOKEN_ASSINADO" }
-```
-
-## Endpoint
-
+- `GET /health`
+- `POST /cards`
+- `GET /cards/{id}`
 - `POST /wallet/sign`
 
-## Variaveis de ambiente
+## Contrato do app (Cards)
+
+O app envia:
+
+```json
+{
+  "name": "Seu Nome",
+  "photo": "https://...",
+  "instagram": "usuario",
+  "whatsapp": "+55...",
+  "website": "https://..."
+}
+```
+
+E recebe:
+
+```json
+{
+  "id": "uuid",
+  "name": "Seu Nome",
+  "photo": "https://...",
+  "instagram": "usuario",
+  "whatsapp": "+55...",
+  "website": "https://...",
+  "qrCode": "data:image/png;base64,..."
+}
+```
+
+## Variáveis de ambiente
 
 Use o arquivo `.env.example` como base:
 
 - `PORT`
+- `CARDS_PUBLIC_BASE_URL`
+- `CARDS_DATA_DIR`
 - `GOOGLE_WALLET_ORIGINS`
 - `GOOGLE_SERVICE_ACCOUNT_EMAIL`
 - `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY`
@@ -37,6 +62,8 @@ Exemplo:
 
 ```env
 PORT=8080
+CARDS_PUBLIC_BASE_URL=http://localhost:8080
+CARDS_DATA_DIR=./data
 GOOGLE_WALLET_ORIGINS=http://localhost:3000
 GOOGLE_SERVICE_ACCOUNT_EMAIL=wallet-signer@seu-projeto.iam.gserviceaccount.com
 GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIIEv...\n-----END PRIVATE KEY-----\n"
@@ -58,7 +85,26 @@ npm run dev
 
 ## Exemplo de teste local
 
+### Criar cartão
+
+```powershell
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://localhost:8080/cards" `
+  -ContentType "application/json" `
+  -Body (@{
+    name = "Seu Nome"
+    photo = "https://example.com/photo.png"
+  } | ConvertTo-Json)
+```
+
+### Assinar JWT do Wallet
+
 Com o servidor rodando, envie o payload de exemplo:
+
+```json
+{ "jwt": "TOKEN_ASSINADO" }
+```
 
 ```powershell
 Invoke-RestMethod `
@@ -67,14 +113,6 @@ Invoke-RestMethod `
   -ContentType "application/json" `
   -InFile ".\sample-payload.json"
 ```
-
-Resposta esperada:
-
-```json
-{ "jwt": "TOKEN_ASSINADO" }
-```
-
-## Contrato esperado do app
 
 O app pode enviar o payload inteiro ou um objeto no formato:
 
@@ -98,3 +136,26 @@ O backend completa:
 e depois assina via `RS256`.
 
 O arquivo `sample-payload.json` neste diretorio serve como ponto de partida para esse teste.
+
+## Deploy na Oracle Cloud (Always Free)
+
+Objetivo: subir esse backend em uma VM Always Free (AMD ou ARM) e expor via IP público ou domínio.
+
+1. Crie uma VM no Oracle Cloud Compute (Always Free) e habilite SSH.
+2. Libere entrada (ingress) para a porta do backend (ex.: `8080`) na Security List/NSG do seu VCN.
+3. Acesse via SSH e instale Docker + Compose.
+4. Clone o repositório na VM e crie `backend/.env` a partir de `.env.example`.
+5. Suba com Docker Compose:
+
+```bash
+cd backend
+docker compose up -d --build
+```
+
+6. Teste:
+
+```bash
+curl http://localhost:8080/health
+```
+
+Dica: em produção, prefira colocar um reverse proxy (Nginx/Caddy) com TLS e apontar `CARDS_PUBLIC_BASE_URL` para o seu domínio (ex.: `https://api.seudominio.com`).
