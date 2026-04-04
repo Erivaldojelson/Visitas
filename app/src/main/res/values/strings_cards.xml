@@ -19,5 +19,12 @@
     <string name="photo_desc">Foto do usuário</string>
     <string name="qr_desc">QR Code</string>
     <string name="qr_hint">Aponte a câmera para abrir seu cartão.</string>
-</resources>
 
+    <string name="nowbar_share">Compartilhar</string>
+    <string name="nowbar_qr_desc">QR Code (mini)</string>
+    <string name="nowbar_views_format">Visualizações: %1$d</string>
+    <string name="nowbar_channel_name">Cartão (Now Bar)</string>
+    <string name="nowbar_channel_description">Notificação persistente do cartão de visita digital</string>
+    <string name="nowbar_default_name">Seu cartão</string>
+    <string name="nowbar_default_role">Cartão digital</string>
+</resources>
