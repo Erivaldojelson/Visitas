@@ -13,7 +13,6 @@ import android.os.IBinder
 import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import androidx.core.os.bundleOf
 import com.monst.transfiranow.MainActivity
 import com.monst.transfiranow.R
 
@@ -91,6 +90,47 @@ class CardNowbarService : Service() {
     }
 
     private fun buildNotification(): Notification {
+        val contentIntent = NowbarIntents.openAppPendingIntent(this)
+        return if (shouldUseLiveUpdates()) {
+            buildLiveUpdateNotification(contentIntent)
+        } else {
+            buildRemoteViewsNotification(contentIntent)
+        }
+    }
+
+    private fun shouldUseLiveUpdates(): Boolean {
+        // Live Updates (Android 16+) requer "promoted ongoing notifications" e NÃO aceita RemoteViews.
+        return Build.VERSION.SDK_INT >= 36 && NotificationManagerCompat.from(this).canPostPromotedNotifications()
+    }
+
+    private fun buildLiveUpdateNotification(contentIntent: android.app.PendingIntent): Notification {
+        val safeName = userName.ifBlank { getString(R.string.nowbar_default_name) }
+        val safeRole = userRole.ifBlank { getString(R.string.nowbar_default_role) }
+        val subtitle = "$safeRole • ${getString(R.string.nowbar_views_format, viewsCount)}"
+
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_stat_download)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setContentIntent(contentIntent)
+            .setContentTitle(safeName)
+            .setContentText(subtitle)
+            .addAction(
+                NotificationCompat.Action(
+                    android.R.drawable.ic_menu_share,
+                    getString(R.string.nowbar_share),
+                    NowbarIntents.sharePendingIntent(this, safeName, safeRole)
+                )
+            )
+            // Pede promoção para Live Updates / System surfaces (Android 16+).
+            .setRequestPromotedOngoing(true)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(subtitle))
+            .build()
+    }
+
+    private fun buildRemoteViewsNotification(contentIntent: android.app.PendingIntent): Notification {
         val remoteViews = RemoteViews(packageName, R.layout.layout_card_nowbar).apply {
             setTextViewText(R.id.tvName, userName.ifBlank { getString(R.string.nowbar_default_name) })
             setTextViewText(R.id.tvRole, userRole.ifBlank { getString(R.string.nowbar_default_role) })
@@ -109,9 +149,7 @@ class CardNowbarService : Service() {
             )
         }
 
-        val contentIntent = NowbarIntents.openAppPendingIntent(this)
-
-        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
+        return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_download)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -121,19 +159,19 @@ class CardNowbarService : Service() {
             .setCustomContentView(remoteViews)
             .setStyle(NotificationCompat.DecoratedCustomViewStyle())
             .setExtras(buildSamsungOngoingExtras(userName, userRole))
-
-        return builder.build()
+            .build()
     }
 
-    private fun buildSamsungOngoingExtras(primary: String, secondary: String): Bundle = bundleOf(
-        // Obs: a Now Bar / Live Notifications da Samsung (One UI) depende também de whitelist do package name.
-        "android.ongoingActivityNoti.style" to 1,
-        "android.ongoingActivityNoti.primaryInfo" to primary,
-        "android.ongoingActivityNoti.secondaryInfo" to secondary,
-        "android.ongoingActivityNoti.chipExpandedText" to primary,
-        "android.ongoingActivityNoti.nowbarPrimaryInfo" to primary,
-        "android.ongoingActivityNoti.nowbarSecondaryInfo" to secondary
-    )
+    private fun buildSamsungOngoingExtras(primary: String, secondary: String): Bundle =
+        Bundle().apply {
+            // Obs: a Now Bar / Live Notifications da Samsung (One UI) depende também de whitelist do package name.
+            putInt("android.ongoingActivityNoti.style", 1)
+            putString("android.ongoingActivityNoti.primaryInfo", primary)
+            putString("android.ongoingActivityNoti.secondaryInfo", secondary)
+            putString("android.ongoingActivityNoti.chipExpandedText", primary)
+            putString("android.ongoingActivityNoti.nowbarPrimaryInfo", primary)
+            putString("android.ongoingActivityNoti.nowbarSecondaryInfo", secondary)
+        }
 
     private fun ensureChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
@@ -223,14 +261,22 @@ class CardNowbarService : Service() {
 }
 
 private object NowbarIntents {
-    fun openAppPendingIntent(context: Context) =
-        androidx.core.app.TaskStackBuilder.create(context).run {
+    fun openAppPendingIntent(context: Context): android.app.PendingIntent {
+        val fromStack = androidx.core.app.TaskStackBuilder.create(context).run {
             addNextIntentWithParentStack(Intent(context, MainActivity::class.java))
             getPendingIntent(
                 100,
                 android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
             )
         }
+
+        return fromStack ?: android.app.PendingIntent.getActivity(
+            context,
+            100,
+            Intent(context, MainActivity::class.java),
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+        )
+    }
 
     fun sharePendingIntent(context: Context, userName: String, userRole: String): android.app.PendingIntent {
         val intent = Intent(context, ShareCardReceiver::class.java).apply {
