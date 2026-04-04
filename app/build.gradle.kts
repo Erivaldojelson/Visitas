@@ -21,8 +21,21 @@ android {
         }
     }
 
+    val rawCardsApiBaseUrl = (project.findProperty("CARDS_API_BASE_URL") as String?)
+        ?: System.getenv("CARDS_API_BASE_URL")
+        ?: "http://10.0.2.2:8080/"
+
+    val cardsApiBaseUrl = rawCardsApiBaseUrl.trim().let { url ->
+        if (url.endsWith("/")) url else "$url/"
+    }
+
     buildTypes {
+        debug {
+            buildConfigField("String", "CARDS_API_BASE_URL", "\"$cardsApiBaseUrl\"")
+        }
+
         release {
+            buildConfigField("String", "CARDS_API_BASE_URL", "\"$cardsApiBaseUrl\"")
             isMinifyEnabled = false
             // Signed with debug key so the generated APK is installable for downloads.
             // Replace with your own keystore before publishing.
