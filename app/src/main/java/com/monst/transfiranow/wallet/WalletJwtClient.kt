@@ -36,8 +36,12 @@ class WalletJwtClient {
         val trimmed = body.trim()
         if (!trimmed.startsWith("{")) return trimmed
         val json = JSONObject(trimmed)
-        return json.optString("jwt").ifBlank {
-            throw IllegalStateException("Resposta do backend não contém o campo jwt.")
+        json.optString("jwt").takeIf { it.isNotBlank() }?.let { return it }
+
+        json.optString("error").takeIf { it.isNotBlank() }?.let { message ->
+            throw IllegalStateException(message)
         }
+
+        throw IllegalStateException("Resposta do backend não contém o campo jwt.")
     }
 }

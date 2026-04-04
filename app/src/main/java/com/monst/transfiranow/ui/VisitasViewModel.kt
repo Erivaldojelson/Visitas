@@ -199,6 +199,8 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
         }
 
         viewModelScope.launch {
+            val issuerId = state.walletIssuerId.trim()
+            val backendEndpoint = normalizeWalletBackendEndpoint(state.walletBackendUrl)
             _uiState.update {
                 it.copy(
                     isSavingToWallet = true,
@@ -206,11 +208,11 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
                 )
             }
             val payload = WalletPassBuilder.buildUnsignedPayload(
-                issuerId = state.walletIssuerId,
+                issuerId = issuerId,
                 classSuffix = state.walletClassSuffix.ifBlank { "visitas_card" },
                 card = card
             )
-            val result = walletJwtClient.fetchSignedJwt(state.walletBackendUrl, payload)
+            val result = walletJwtClient.fetchSignedJwt(backendEndpoint, payload)
             result.onSuccess { jwt ->
                 _uiState.update {
                     it.copy(
@@ -228,6 +230,13 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
                 }
             }
         }
+    }
+
+    private fun normalizeWalletBackendEndpoint(raw: String): String {
+        val trimmed = raw.trim().removeSuffix("/")
+        if (trimmed.isBlank()) return trimmed
+        if (trimmed.contains("/wallet/sign")) return trimmed
+        return if (trimmed.matches(Regex("^https?://[^/]+$"))) "$trimmed/wallet/sign" else trimmed
     }
 
     fun onWalletSaveResult(message: String) {
