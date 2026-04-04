@@ -25,14 +25,14 @@ object WalletPassBuilder {
 
         val genericClass = JSONObject()
             .put("id", classId)
-            .put("classTemplateInfo", JSONObject())
             .put("reviewStatus", "UNDER_REVIEW")
             .put("cardTitle", localized("Visitas"))
 
         val genericObject = JSONObject()
             .put("id", objectId)
             .put("classId", classId)
-            .put("hexBackgroundColor", card.passColor)
+            .put("state", "ACTIVE")
+            .put("hexBackgroundColor", normalizeHexBackgroundColor(card.passColor))
             .put("cardTitle", localized(card.name))
             .put("subheader", localized(card.role.ifBlank { "Cartão pessoal" }))
             .put("header", localized(card.phone.ifBlank { card.email.ifBlank { "Contato" } }))
@@ -62,6 +62,13 @@ object WalletPassBuilder {
             .put("payload", JSONObject()
                 .put("genericClasses", JSONArray().put(genericClass))
                 .put("genericObjects", JSONArray().put(genericObject)))
+    }
+
+    private fun normalizeHexBackgroundColor(value: String): String {
+        val trimmed = value.trim()
+        if (trimmed.matches(Regex("^#[0-9a-fA-F]{6}$"))) return trimmed
+        if (trimmed.matches(Regex("^#[0-9a-fA-F]{8}$"))) return "#${trimmed.substring(3)}"
+        return "#0F766E"
     }
 
     private fun localized(value: String) = JSONObject()

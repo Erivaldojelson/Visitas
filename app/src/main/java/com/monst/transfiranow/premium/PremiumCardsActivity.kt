@@ -12,6 +12,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.core.view.WindowCompat
 import com.google.android.gms.pay.Pay
 import com.google.android.gms.pay.PayClient
+import com.google.android.gms.pay.PayClient.SavePassesResult
 import com.monst.transfiranow.ui.VisitasViewModel
 import com.monst.transfiranow.ui.theme.TransfiraNowTheme
 import com.monst.transfiranow.util.parseColor
@@ -57,6 +58,24 @@ class PremiumCardsActivity : ComponentActivity() {
             WindowCompat.setDecorFitsSystemWindows(this, false)
             statusBarColor = android.graphics.Color.TRANSPARENT
             navigationBarColor = android.graphics.Color.TRANSPARENT
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != ADD_TO_WALLET_REQUEST_CODE) return
+
+        when (resultCode) {
+            RESULT_OK -> viewModel.onWalletSaveResult("Cartão salvo no Google Wallet com sucesso.")
+            RESULT_CANCELED -> viewModel.onWalletSaveResult("Operação cancelada no Google Wallet.")
+            SavePassesResult.SAVE_ERROR -> {
+                val rawMessage = data?.getStringExtra(PayClient.EXTRA_API_ERROR_MESSAGE).orEmpty()
+                val extras = data?.extras
+                val debugExtras = extras?.keySet()?.sorted()?.joinToString(prefix = " extras=[", postfix = "]")
+                val message = rawMessage.ifBlank { "Erro ao salvar no Google Wallet." } + (debugExtras ?: "")
+                viewModel.onWalletSaveResult(message)
+            }
+            else -> viewModel.onWalletSaveResult("Falha inesperada ao abrir o Google Wallet.")
         }
     }
 

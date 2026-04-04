@@ -71,8 +71,11 @@ class MainActivity : ComponentActivity() {
             RESULT_OK -> viewModel.onWalletSaveResult("Cartão salvo no Google Wallet com sucesso.")
             RESULT_CANCELED -> viewModel.onWalletSaveResult("Operação cancelada no Google Wallet.")
             PayClient.SavePassesResult.SAVE_ERROR -> {
-                val message = data?.getStringExtra(PayClient.EXTRA_API_ERROR_MESSAGE)
-                viewModel.onWalletSaveResult(message ?: "Erro ao salvar no Google Wallet.")
+                val rawMessage = data?.getStringExtra(PayClient.EXTRA_API_ERROR_MESSAGE).orEmpty()
+                val extras = data?.extras
+                val debugExtras = extras?.keySet()?.sorted()?.joinToString(prefix = " extras=[", postfix = "]")
+                val message = rawMessage.ifBlank { "Erro ao salvar no Google Wallet." } + (debugExtras ?: "")
+                viewModel.onWalletSaveResult(message)
             }
             else -> viewModel.onWalletSaveResult("Falha inesperada ao abrir o Google Wallet.")
         }
