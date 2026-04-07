@@ -31,6 +31,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
 
 class VisitasViewModel(application: Application) : AndroidViewModel(application) {
     private val store = CardStore(application)
@@ -49,6 +50,8 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
                         walletBackendUrl = persisted.walletBackendUrl,
                         appLanguage = persisted.appLanguage,
                         appLockEnabled = persisted.appLockEnabled,
+                        notificationsEnabled = persisted.notificationsEnabled,
+                        liveUpdatesEnabled = persisted.liveUpdatesEnabled,
                         statusMessage = if (it.statusMessage == CardsUiState().statusMessage) {
                             message(persisted.appLanguage, "create_intro")
                         } else {
@@ -284,24 +287,47 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun setNotificationsEnabled(enabled: Boolean) {
+        _uiState.update {
+            it.copy(
+                notificationsEnabled = enabled,
+                liveUpdatesEnabled = if (enabled) it.liveUpdatesEnabled else false
+            )
+        }
+        viewModelScope.launch {
+            store.persistNotificationsEnabled(enabled)
+            if (!enabled) {
+                store.persistLiveUpdatesEnabled(false)
+            }
+        }
+    }
+
+    fun setLiveUpdatesEnabled(enabled: Boolean) {
+        _uiState.update { it.copy(liveUpdatesEnabled = enabled) }
+        viewModelScope.launch {
+            store.persistLiveUpdatesEnabled(enabled)
+        }
+    }
+
     fun setWalletAvailability(available: Boolean) {
         _uiState.update { it.copy(canUseGoogleWallet = available) }
     }
 
-    fun saveDraft() {
+    fun saveDraft(): Job? {
         val state = _uiState.value
         val draft = state.draft
         if (draft.name.isBlank()) {
             _uiState.update { it.copy(statusMessage = message(it.appLanguage, "need_name")) }
-            return
+            return null
         }
-          viewModelScope.launch {
-              store.saveCard(draft)
-              MyCardWidgetProvider.requestUpdate(getApplication())
-              _uiState.update {
-                  it.copy(
-                      draft = CardDraft(passColor = it.draft.passColor),
-                      statusMessage = message(it.appLanguage, "pass_saved")
+
+        return viewModelScope.launch {
+            store.saveCard(draft)
+            MyCardWidgetProvider.requestUpdate(getApplication())
+            _uiState.update {
+                it.copy(
+                    draft = CardDraft(passColor = it.draft.passColor),
+                    statusMessage = message(it.appLanguage, "pass_saved")
                 )
             }
         }

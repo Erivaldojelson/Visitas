@@ -1,5 +1,11 @@
 # Changelog
 
+## Visitas 1.8.5 - 2026-04-07
+
+- Configurações → Notificações: switch para ativar, botão para abrir configurações do sistema e testes rápidos.
+- Suporte a Live Updates no Android 16+ (notificação fixada/promovida com chip), com atalho para permitir nas configurações.
+- Build atualizado para Android SDK 36 (AGP/Gradle) para suportar as APIs de Live Update.
+
 ## Visitas 1.8.4 - 2026-04-07
 
 - Ajuste de espaçamento no topo: botão de voltar e cartão não encostam mais na barra de status.

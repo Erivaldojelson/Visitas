@@ -1,8 +1,11 @@
 package com.monst.transfiranow.ui
 
+import android.Manifest
 import android.graphics.Bitmap
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.provider.ContactsContract
 import android.widget.ImageView
 import android.widget.Toast
@@ -114,6 +117,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.google.zxing.BarcodeFormat
@@ -123,6 +127,7 @@ import com.monst.transfiranow.BuildConfig
 import com.monst.transfiranow.data.AppLanguage
 import com.monst.transfiranow.data.CardDraft
 import com.monst.transfiranow.data.VisitingCard
+import com.monst.transfiranow.notifications.AppNotifications
 import com.monst.transfiranow.premium.PremiumCardsActivity
 import com.monst.transfiranow.share.CardExport
 import com.monst.transfiranow.share.CardsBackup
@@ -154,6 +159,7 @@ fun VisitasApp(
     viewModel: VisitasViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
     var tab by remember { mutableStateOf(AppTab.HOME) }
     val scope = rememberCoroutineScope()
     var detailsCardId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -253,14 +259,24 @@ fun VisitasApp(
                                     onDraftChange = viewModel::updateDraft,
                                     onWalletSettingsChange = viewModel::updateWalletSettings,
                                     onCreatePass = {
-                                        if (uiState.draft.name.isBlank()) {
-                                            viewModel.saveDraft()
-                                        } else {
-                                            scope.launch {
-                                                showColorfulOverlay = true
-                                                viewModel.saveDraft()
-                                                delay(1100)
-                                                showColorfulOverlay = false
+                                        scope.launch {
+                                            val cardName = uiState.draft.name.trim()
+                                            val job = viewModel.saveDraft() ?: return@launch
+
+                                            val shouldNotify =
+                                                uiState.notificationsEnabled && AppNotifications.canPostNotifications(context)
+
+                                            if (shouldNotify && uiState.liveUpdatesEnabled) {
+                                                AppNotifications.postCardGenerationLiveUpdate(context, cardName)
+                                            }
+
+                                            showColorfulOverlay = true
+                                            job.join()
+                                            delay(1100)
+                                            showColorfulOverlay = false
+
+                                            if (shouldNotify) {
+                                                AppNotifications.postCardGenerationCompleted(context, cardName)
                                             }
                                         }
                                     },
@@ -290,6 +306,8 @@ fun VisitasApp(
                                     cards = uiState.cards,
                                     currentLanguage = uiState.appLanguage,
                                     appLockEnabled = uiState.appLockEnabled,
+                                    notificationsEnabled = uiState.notificationsEnabled,
+                                    liveUpdatesEnabled = uiState.liveUpdatesEnabled,
                                     canUseGoogleWallet = uiState.canUseGoogleWallet,
                                     walletIssuerId = uiState.walletIssuerId,
                                     walletClassSuffix = uiState.walletClassSuffix,
@@ -297,6 +315,8 @@ fun VisitasApp(
                                     t = t,
                                     onLanguageSelected = viewModel::updateLanguage,
                                     onAppLockEnabledChange = viewModel::setAppLockEnabled,
+                                    onNotificationsEnabledChange = viewModel::setNotificationsEnabled,
+                                    onLiveUpdatesEnabledChange = viewModel::setLiveUpdatesEnabled,
                                     onWalletSettingsChange = viewModel::updateWalletSettings,
                                     onPersistWalletSettings = viewModel::persistWalletSettings,
                                     onImportBackup = viewModel::importBackupFromUri
@@ -729,6 +749,8 @@ private fun SettingsScreen(
     cards: List<VisitingCard>,
     currentLanguage: AppLanguage,
     appLockEnabled: Boolean,
+    notificationsEnabled: Boolean,
+    liveUpdatesEnabled: Boolean,
     canUseGoogleWallet: Boolean,
     walletIssuerId: String,
     walletClassSuffix: String,
@@ -736,6 +758,8 @@ private fun SettingsScreen(
     t: (String) -> String,
     onLanguageSelected: (AppLanguage) -> Unit,
     onAppLockEnabledChange: (Boolean) -> Unit,
+    onNotificationsEnabledChange: (Boolean) -> Unit,
+    onLiveUpdatesEnabledChange: (Boolean) -> Unit,
     onWalletSettingsChange: (String?, String?, String?) -> Unit,
     onPersistWalletSettings: () -> Unit,
     onImportBackup: (Uri) -> Unit
@@ -806,6 +830,197 @@ private fun SettingsScreen(
                                 },
                                 enabled = canUseBiometric
                             )
+                        }
+                    }
+                }
+            }
+            item {
+                val hasNotificationPermission = if (Build.VERSION.SDK_INT < 33) {
+                    true
+                } else {
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+                }
+
+                val requestPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+                    if (granted) {
+                        AppNotifications.ensureChannels(context)
+                        onNotificationsEnabledChange(true)
+                        Toast.makeText(context, "Notificações ativadas.", Toast.LENGTH_SHORT).show()
+                    } else {
+                        onNotificationsEnabledChange(false)
+                        Toast.makeText(context, "Permissão de notificações negada.", Toast.LENGTH_LONG).show()
+                    }
+                }
+
+                LaunchedEffect(hasNotificationPermission, notificationsEnabled) {
+                    if (notificationsEnabled && !hasNotificationPermission) {
+                        onNotificationsEnabledChange(false)
+                    }
+                }
+
+                val isAndroid16 = Build.VERSION.SDK_INT >= 36
+                val canPromote = if (isAndroid16) AppNotifications.canPostPromotedNotifications(context) else false
+
+                LaunchedEffect(canPromote, liveUpdatesEnabled, notificationsEnabled) {
+                    if (!notificationsEnabled && liveUpdatesEnabled) {
+                        onLiveUpdatesEnabledChange(false)
+                    } else if (liveUpdatesEnabled && !canPromote) {
+                        onLiveUpdatesEnabledChange(false)
+                    }
+                }
+
+                ElevatedCard(shape = RoundedCornerShape(28.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                        Text("Notificações", style = MaterialTheme.typography.titleLarge)
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text("Ativar notificações", style = MaterialTheme.typography.titleMedium)
+                                Text(
+                                    "Receba avisos quando um cartão for criado.",
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                if (!hasNotificationPermission && Build.VERSION.SDK_INT >= 33) {
+                                    Text(
+                                        "Permita nas configurações do sistema para funcionar.",
+                                        color = MaterialTheme.colorScheme.error,
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Switch(
+                                checked = notificationsEnabled && hasNotificationPermission,
+                                onCheckedChange = { enabled ->
+                                    if (!enabled) {
+                                        onNotificationsEnabledChange(false)
+                                        onLiveUpdatesEnabledChange(false)
+                                        AppNotifications.cancelCardStatus(context)
+                                        return@Switch
+                                    }
+
+                                    if (Build.VERSION.SDK_INT >= 33 && !hasNotificationPermission) {
+                                        requestPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                    } else {
+                                        AppNotifications.ensureChannels(context)
+                                        onNotificationsEnabledChange(true)
+                                    }
+                                }
+                            )
+                        }
+
+                        if (!hasNotificationPermission && Build.VERSION.SDK_INT >= 33) {
+                            FilledTonalButton(onClick = { AppNotifications.openAppNotificationSettings(context) }) {
+                                Text("Abrir configurações de notificações")
+                            }
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(22.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh
+                        ) {
+                            Column(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Text("Live Updates (Android 16+)", style = MaterialTheme.typography.titleMedium)
+                                        Text(
+                                            if (isAndroid16) {
+                                                "Mostra uma notificação fixada com chip na barra de status."
+                                            } else {
+                                                "Disponível somente no Android 16 ou superior."
+                                            },
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+                                        if (isAndroid16 && notificationsEnabled && !canPromote) {
+                                            Text(
+                                                "Ative 'Live Updates' nas configurações do sistema.",
+                                                color = MaterialTheme.colorScheme.error,
+                                                style = MaterialTheme.typography.bodyMedium
+                                            )
+                                        }
+                                    }
+                                    Spacer(Modifier.width(12.dp))
+                                    Switch(
+                                        checked = liveUpdatesEnabled && canPromote,
+                                        onCheckedChange = { enabled ->
+                                            if (!enabled) {
+                                                onLiveUpdatesEnabledChange(false)
+                                                return@Switch
+                                            }
+
+                                            if (!notificationsEnabled) {
+                                                Toast.makeText(context, "Ative as notificações primeiro.", Toast.LENGTH_LONG).show()
+                                                return@Switch
+                                            }
+
+                                            if (!isAndroid16) {
+                                                Toast.makeText(context, "Requer Android 16+.", Toast.LENGTH_LONG).show()
+                                                return@Switch
+                                            }
+
+                                            if (!canPromote) {
+                                                AppNotifications.openAppNotificationPromotionSettings(context)
+                                                Toast.makeText(context, "Ative o Live Update e volte aqui.", Toast.LENGTH_LONG).show()
+                                                return@Switch
+                                            }
+
+                                            onLiveUpdatesEnabledChange(true)
+                                        },
+                                        enabled = notificationsEnabled && isAndroid16
+                                    )
+                                }
+
+                                if (isAndroid16 && notificationsEnabled && !canPromote) {
+                                    FilledTonalButton(onClick = { AppNotifications.openAppNotificationPromotionSettings(context) }) {
+                                        Text("Permitir Live Updates")
+                                    }
+                                }
+                            }
+                        }
+
+                        if (notificationsEnabled && hasNotificationPermission) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                FilledTonalButton(
+                                    onClick = {
+                                        AppNotifications.postCardGenerationCompleted(context, "Cartão de teste")
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("Testar notificação")
+                                }
+                                FilledTonalButton(
+                                    onClick = {
+                                        scope.launch {
+                                            AppNotifications.postCardGenerationLiveUpdate(
+                                                context,
+                                                "Cartão de teste",
+                                                criticalText = "Teste"
+                                            )
+                                            delay(2000)
+                                            AppNotifications.postCardGenerationCompleted(context, "Cartão de teste")
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    enabled = isAndroid16 && canPromote && liveUpdatesEnabled
+                                ) {
+                                    Text("Testar Live Update")
+                                }
+                            }
                         }
                     }
                 }
@@ -1182,7 +1397,7 @@ private fun PassDetailsScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .statusBarsPadding()
-                        .padding(vertical = 10.dp)
+                        .padding(top = 18.dp, bottom = 12.dp)
                 ) {
                     val side = adaptiveSidePadding(maxWidth, maxContentWidth = 560.dp)
                     Box(Modifier.fillMaxWidth().padding(horizontal = side)) {
@@ -1205,7 +1420,7 @@ private fun PassDetailsScreen(
                 val side = adaptiveSidePadding(maxWidth, maxContentWidth = 560.dp)
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(side, 20.dp, side, 28.dp),
+                    contentPadding = PaddingValues(side, 32.dp, side, 28.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     item {

@@ -54,6 +54,8 @@ data class CardsUiState(
     val walletBackendUrl: String = "",
     val appLanguage: AppLanguage = AppLanguage.PT_BR,
     val appLockEnabled: Boolean = false,
+    val notificationsEnabled: Boolean = false,
+    val liveUpdatesEnabled: Boolean = false,
     val canUseGoogleWallet: Boolean = false,
     val statusMessage: String = "Crie um passe, salve no app e depois envie para o Google Wallet.",
     val isSavingToWallet: Boolean = false

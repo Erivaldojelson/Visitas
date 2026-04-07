@@ -39,7 +39,7 @@ jobs:
 
       - name: Install SDK packages
         run: |
-          sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
+          sdkmanager --install "platforms;android-36" "build-tools;36.1.0"
 
       - name: Build release APK
         run: ./gradlew :app:assembleRelease

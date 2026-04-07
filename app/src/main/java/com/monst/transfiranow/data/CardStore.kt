@@ -21,6 +21,8 @@ class CardStore(private val context: Context) {
     private val backendUrlKey = stringPreferencesKey("wallet_backend_url")
     private val languageKey = stringPreferencesKey("app_language")
     private val appLockKey = booleanPreferencesKey("app_lock_enabled")
+    private val notificationsEnabledKey = booleanPreferencesKey("notifications_enabled")
+    private val liveUpdatesEnabledKey = booleanPreferencesKey("live_updates_enabled")
 
     val uiStateFlow: Flow<CardsUiState> = context.dataStore.data.map { preferences ->
         CardsUiState(
@@ -29,7 +31,9 @@ class CardStore(private val context: Context) {
             walletClassSuffix = preferences[classSuffixKey] ?: "visitas_card",
             walletBackendUrl = preferences[backendUrlKey].orEmpty(),
             appLanguage = AppLanguage.fromCode(preferences[languageKey].orEmpty()),
-            appLockEnabled = preferences[appLockKey] ?: false
+            appLockEnabled = preferences[appLockKey] ?: false,
+            notificationsEnabled = preferences[notificationsEnabledKey] ?: false,
+            liveUpdatesEnabled = preferences[liveUpdatesEnabledKey] ?: false
         )
     }
 
@@ -78,6 +82,18 @@ class CardStore(private val context: Context) {
     suspend fun persistAppLockEnabled(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[appLockKey] = enabled
+        }
+    }
+
+    suspend fun persistNotificationsEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[notificationsEnabledKey] = enabled
+        }
+    }
+
+    suspend fun persistLiveUpdatesEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[liveUpdatesEnabledKey] = enabled
         }
     }
 
