@@ -1,5 +1,10 @@
 # Changelog
 
+## Visitas 1.8.3 - 2026-04-07
+
+- Tela de detalhes sem título no topo e sem texto “Voltar” (apenas botão circular transparente).
+- Cartão com efeito glass/blur suave seguindo a cor do passe, incluindo QR code e textos sempre em branco para melhor legibilidade.
+
 ## Visitas 1.8.2 - 2026-04-07
 
 - Cartão abre em uma nova tela de detalhes (sem expansão dentro da lista).

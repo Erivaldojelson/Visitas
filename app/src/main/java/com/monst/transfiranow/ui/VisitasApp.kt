@@ -30,6 +30,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -92,6 +93,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -1076,24 +1078,22 @@ private fun PassDetailsScreen(
         Scaffold(
             containerColor = Color.Transparent,
             topBar = {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
                 ) {
-                    TextButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null, tint = Color.White)
-                        Spacer(Modifier.width(6.dp))
-                        Text("Voltar", color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Surface(
+                        onClick = onBack,
+                        modifier = Modifier.size(44.dp),
+                        shape = CircleShape,
+                        color = Color.Transparent,
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.22f))
+                    ) {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null, tint = Color.White)
+                        }
                     }
-                    Text(
-                        title,
-                        modifier = Modifier.weight(1f),
-                        color = Color.White,
-                        style = MaterialTheme.typography.titleLarge,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
                 }
             }
         ) { padding ->
@@ -1144,33 +1144,191 @@ private fun PassExpandedCard(
     qrValue: String,
     qrLabel: String
 ) {
-    Surface(
+    PassTicketGlass(
+        accentColor = accentColor,
+        photoUri = photoUri,
+        badgeText = badgeText,
+        title = title,
+        subtitle = subtitle,
+        tertiary = tertiary,
+        lines = lines,
+        qrValue = qrValue,
+        qrLabel = qrLabel
+    )
+}
+
+@Composable
+private fun PassTicketGlass(
+    accentColor: Color,
+    photoUri: String,
+    badgeText: String,
+    title: String,
+    subtitle: String,
+    tertiary: String,
+    lines: List<Pair<String, String>>,
+    qrValue: String,
+    qrLabel: String
+) {
+    val shape = RoundedCornerShape(34.dp)
+    val transition = rememberInfiniteTransition(label = "glass-ticket")
+    val time01 by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(8200, easing = LinearEasing), repeatMode = RepeatMode.Restart),
+        label = "glass-time"
+    )
+
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(32.dp)),
-        color = accentColor
+            .clip(shape)
+            .border(1.dp, Color.White.copy(alpha = 0.14f), shape)
     ) {
-        Column(Modifier.fillMaxWidth().padding(2.dp)) {
-            Surface(
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .drawWithCache {
+                    val tau = (2f * PI).toFloat()
+
+                    val c1x = 0.5f + 0.42f * sin(tau * (time01 * 0.18f) + 0.2f)
+                    val c1y = 0.5f + 0.38f * cos(tau * (time01 * 0.16f) + 0.7f)
+                    val c2x = 0.5f + 0.45f * cos(tau * (time01 * 0.22f) + 1.1f)
+                    val c2y = 0.5f + 0.40f * sin(tau * (time01 * 0.20f) + 0.4f)
+
+                    val base = Brush.linearGradient(
+                        colors = listOf(
+                            Color(0xFF0B0C0F),
+                            Color(0xFF141823),
+                            Color(0xFF0B0C0F)
+                        ),
+                        start = Offset(size.width * 0.05f, 0f),
+                        end = Offset(size.width * 0.95f, size.height)
+                    )
+
+                    val glow1 = Brush.radialGradient(
+                        colors = listOf(
+                            accentColor.copy(alpha = 0.65f),
+                            accentColor.copy(alpha = 0.0f)
+                        ),
+                        center = Offset(size.width * c1x, size.height * c1y),
+                        radius = size.minDimension * 0.85f
+                    )
+
+                    val glow2 = Brush.radialGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.22f),
+                            Color.Transparent
+                        ),
+                        center = Offset(size.width * c2x, size.height * c2y),
+                        radius = size.minDimension * 0.95f
+                    )
+
+                    onDrawBehind {
+                        drawRect(brush = base, alpha = 0.98f)
+                        drawCircle(brush = glow1, radius = size.minDimension * 0.85f, center = Offset(size.width * c1x, size.height * c1y), alpha = 0.55f)
+                        drawCircle(brush = glow2, radius = size.minDimension * 0.95f, center = Offset(size.width * c2x, size.height * c2y), alpha = 0.60f)
+                    }
+                }
+                .blur(18.dp)
+        )
+
+        Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.16f)))
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                PhotoBubble(photoUri, accentColor, Modifier.size(52.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        title,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White
+                    )
+                    if (subtitle.isNotBlank()) {
+                        Text(subtitle, color = Color.White.copy(alpha = 0.78f))
+                    }
+                }
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(accentColor.copy(alpha = 0.22f))
+                        .border(1.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(999.dp))
+                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                ) {
+                    Text(badgeText, color = Color.White, fontWeight = FontWeight.Medium)
+                }
+            }
+
+            if (tertiary.isNotBlank()) {
+                Text(tertiary, color = Color.White.copy(alpha = 0.72f))
+            }
+
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(30.dp)),
-                shape = RoundedCornerShape(30.dp),
-                color = accentColor
+                    .clip(RoundedCornerShape(26.dp))
+                    .background(Color.White.copy(alpha = 0.06f))
+                    .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(26.dp))
+                    .padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                PassTicket(
-                    accentColor = accentColor,
-                    photoUri = photoUri,
-                    badgeText = badgeText,
-                    title = title,
-                    subtitle = subtitle,
-                    tertiary = tertiary,
-                    lines = lines,
-                    qrValue = qrValue,
-                    qrLabel = qrLabel
-                )
+                lines.forEach { (label, value) -> GlassTicketLine(label, value) }
+            }
+
+            if (qrValue.isNotBlank()) {
+                GlassTicketQr(value = qrValue, label = qrLabel)
             }
         }
+    }
+}
+
+@Composable
+private fun GlassTicketLine(label: String, value: String) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
+        Text(label, style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.74f))
+        Spacer(Modifier.width(16.dp))
+        Text(
+            value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color.White,
+            textAlign = TextAlign.End,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+@Composable
+private fun GlassTicketQr(value: String, label: String) {
+    val bitmap = remember(value) { generateQrBitmap(value) }
+    Column(
+        Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        bitmap?.let {
+            androidx.compose.foundation.Image(
+                bitmap = it.asImageBitmap(),
+                contentDescription = label,
+                modifier = Modifier
+                    .size(220.dp)
+                    .clip(RoundedCornerShape(28.dp))
+                    .background(Color.White.copy(alpha = 0.94f))
+                    .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(28.dp))
+                    .padding(14.dp)
+            )
+        }
+        Text(label, style = MaterialTheme.typography.titleMedium, color = Color.White)
+        Text(
+            value,
+            style = MaterialTheme.typography.bodySmall,
+            color = Color.White.copy(alpha = 0.76f),
+            textAlign = TextAlign.Center
+        )
     }
 }
 
