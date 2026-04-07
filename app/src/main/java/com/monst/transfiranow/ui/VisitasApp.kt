@@ -127,8 +127,8 @@ fun VisitasApp(
 
 @Composable
 private fun PillBar(selected: AppTab, t: (String) -> String, onSelect: (AppTab) -> Unit) {
-    Surface(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp), shape = RoundedCornerShape(999.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
-        Row(Modifier.fillMaxWidth().padding(8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    Surface(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 10.dp), shape = RoundedCornerShape(999.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+        Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 6.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             PillItem(AppTab.HOME, selected, t("home"), Icons.Rounded.Home, onSelect)
             PillItem(AppTab.CREATE, selected, t("create"), Icons.Rounded.Add, onSelect)
             PillItem(AppTab.SAVED, selected, t("saved"), Icons.Rounded.Style, onSelect)
@@ -141,9 +141,9 @@ private fun PillBar(selected: AppTab, t: (String) -> String, onSelect: (AppTab) 
 private fun RowScope.PillItem(tab: AppTab, selected: AppTab, label: String, icon: ImageVector, onSelect: (AppTab) -> Unit) {
     val active = tab == selected
     Surface(modifier = Modifier.weight(1f).clip(RoundedCornerShape(999.dp)).clickable { onSelect(tab) }, color = if (active) MaterialTheme.colorScheme.primaryContainer else Color.Transparent) {
-        Column(Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(icon, label, tint = if (active) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(label, style = MaterialTheme.typography.labelMedium, color = if (active) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+        Column(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(icon, label, modifier = Modifier.size(20.dp), tint = if (active) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(label, style = MaterialTheme.typography.labelSmall, color = if (active) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
         }
     }
 }
