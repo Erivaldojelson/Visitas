@@ -3,7 +3,7 @@
 ## Visitas 1.9.0-alpha - 2026-04-07
 
 - Configurações → Notificações: fluxo guiado para ativar permissões e abrir as configurações do sistema quando o app estiver bloqueado.
-- Live Updates (Android 16+): solicita permissão e direciona para a opção “Live notifications”, atualizando o status ao voltar para o app.
+- Live Updates (Android 16+): direciona para a opção “Live notifications” nas configurações do sistema, atualizando o status ao voltar para o app.
 
 ## Visitas 1.8.5 - 2026-04-07
 

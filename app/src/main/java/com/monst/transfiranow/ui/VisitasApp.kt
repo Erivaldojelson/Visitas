@@ -852,21 +852,12 @@ private fun SettingsScreen(
             item {
                 val lifecycleOwner = LocalLifecycleOwner.current
                 val isAndroid16 = Build.VERSION.SDK_INT >= 36
-                val promotedNotificationsPermission = "android.permission.POST_PROMOTED_NOTIFICATIONS"
 
                 fun checkNotificationPermission(): Boolean {
                     if (Build.VERSION.SDK_INT < 33) return true
                     return ContextCompat.checkSelfPermission(
                         context,
                         Manifest.permission.POST_NOTIFICATIONS
-                    ) == PackageManager.PERMISSION_GRANTED
-                }
-
-                fun checkPromotedPermission(): Boolean {
-                    if (!isAndroid16) return true
-                    return ContextCompat.checkSelfPermission(
-                        context,
-                        promotedNotificationsPermission
                     ) == PackageManager.PERMISSION_GRANTED
                 }
 
@@ -881,13 +872,11 @@ private fun SettingsScreen(
 
                 var hasNotificationPermission by remember { mutableStateOf(checkNotificationPermission()) }
                 var systemNotificationsEnabled by remember { mutableStateOf(checkSystemNotificationsEnabled()) }
-                var hasPromotedPermission by remember { mutableStateOf(checkPromotedPermission()) }
                 var canPromote by remember { mutableStateOf(checkCanPromote()) }
 
                 fun refreshNotificationStatus() {
                     hasNotificationPermission = checkNotificationPermission()
                     systemNotificationsEnabled = checkSystemNotificationsEnabled()
-                    hasPromotedPermission = checkPromotedPermission()
                     canPromote = checkCanPromote()
                 }
 
@@ -921,28 +910,6 @@ private fun SettingsScreen(
                         } else {
                             onNotificationsEnabledChange(false)
                             Toast.makeText(context, "Permissão de notificações negada.", Toast.LENGTH_LONG).show()
-                        }
-                    }
-
-                val requestPromotedPermission =
-                    rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-                        refreshNotificationStatus()
-                        if (granted) {
-                            onLiveUpdatesEnabledChange(true)
-
-                            if (!canPromote) {
-                                AppNotifications.openAppNotificationPromotionSettings(context)
-                                Toast.makeText(
-                                    context,
-                                    "Ative “Live notifications” nas configurações do sistema.",
-                                    Toast.LENGTH_LONG
-                                ).show()
-                            } else {
-                                Toast.makeText(context, "Live Updates ativado.", Toast.LENGTH_SHORT).show()
-                            }
-                        } else {
-                            onLiveUpdatesEnabledChange(false)
-                            Toast.makeText(context, "Permissão de Live Updates negada.", Toast.LENGTH_LONG).show()
                         }
                     }
 
@@ -1050,13 +1017,7 @@ private fun SettingsScreen(
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             style = MaterialTheme.typography.bodyMedium
                                         )
-                                        if (isAndroid16 && notificationsEnabled && liveUpdatesEnabled && !hasPromotedPermission) {
-                                            Text(
-                                                "Permita a permissão de Live Updates para funcionar.",
-                                                color = MaterialTheme.colorScheme.error,
-                                                style = MaterialTheme.typography.bodyMedium
-                                            )
-                                        } else if (isAndroid16 && notificationsEnabled && liveUpdatesEnabled && !canPromote) {
+                                        if (isAndroid16 && notificationsEnabled && liveUpdatesEnabled && !canPromote) {
                                             Text(
                                                 "Ative “Live notifications” nas configurações do sistema.",
                                                 color = MaterialTheme.colorScheme.error,
@@ -1083,11 +1044,6 @@ private fun SettingsScreen(
                                                 return@Switch
                                             }
 
-                                            if (!hasPromotedPermission) {
-                                                requestPromotedPermission.launch(promotedNotificationsPermission)
-                                                return@Switch
-                                            }
-
                                             onLiveUpdatesEnabledChange(true)
 
                                             if (!canPromote) {
@@ -1100,13 +1056,9 @@ private fun SettingsScreen(
                                     )
                                 }
 
-                                if (isAndroid16 && notificationsEnabled && !hasPromotedPermission) {
-                                    FilledTonalButton(onClick = { requestPromotedPermission.launch(promotedNotificationsPermission) }) {
-                                        Text("Permitir Live Updates")
-                                    }
-                                } else if (isAndroid16 && notificationsEnabled && liveUpdatesEnabled && !canPromote) {
+                                if (isAndroid16 && notificationsEnabled && liveUpdatesEnabled && !canPromote) {
                                     FilledTonalButton(onClick = { AppNotifications.openAppNotificationPromotionSettings(context) }) {
-                                        Text("Abrir configurações de Live Updates")
+                                        Text("Permitir Live Updates")
                                     }
                                 }
                             }
