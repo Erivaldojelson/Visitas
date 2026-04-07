@@ -8,11 +8,13 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.lifecycle.lifecycleScope
 import com.google.android.gms.pay.Pay
 import com.google.android.gms.pay.PayApiAvailabilityStatus
 import com.google.android.gms.pay.PayClient
 import com.monst.transfiranow.ui.VisitasApp
 import com.monst.transfiranow.ui.VisitasViewModel
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private lateinit var walletClient: PayClient
@@ -49,6 +51,8 @@ class MainActivity : ComponentActivity() {
                 }
             )
         }
+
+        handleWidgetActions(intent)
     }
 
     private fun checkWalletAvailability() {
@@ -81,7 +85,35 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleWidgetActions(intent)
+    }
+
+    private fun handleWidgetActions(intent: Intent?) {
+        if (intent?.action != ACTION_WIDGET_SAVE_TO_WALLET) return
+
+        val cardId = intent.getStringExtra(EXTRA_CARD_ID).orEmpty()
+        if (cardId.isBlank()) {
+            viewModel.onWalletSaveResult("Nenhum cartão selecionado para salvar no Wallet.")
+            return
+        }
+
+        lifecycleScope.launch {
+            val card = viewModel.getCardById(cardId)
+            if (card == null) {
+                viewModel.onWalletSaveResult("Cartão não encontrado para salvar no Wallet.")
+                return@launch
+            }
+            viewModel.prepareWalletJwt(card) { jwt ->
+                walletClient.savePassesJwt(jwt, this@MainActivity, ADD_TO_WALLET_REQUEST_CODE)
+            }
+        }
+    }
+
     companion object {
         private const val ADD_TO_WALLET_REQUEST_CODE = 2401
+        const val ACTION_WIDGET_SAVE_TO_WALLET = "com.monst.transfiranow.action.WIDGET_SAVE_TO_WALLET"
+        const val EXTRA_CARD_ID = "extra_card_id"
     }
 }

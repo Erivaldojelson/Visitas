@@ -387,13 +387,13 @@ private fun CreateInvitesEditorCard(
                         if (draft.qrValue.isBlank()) {
                             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                 FilledTonalButton(onClick = onPickQrCode, modifier = Modifier.weight(1f)) { Text(t("qr_pick")) }
-                                FilledTonalButton(onClick = { qrCamera.launch() }, modifier = Modifier.weight(1f)) { Text(t("qr_scan")) }
+                                FilledTonalButton(onClick = { qrCamera.launch(null) }, modifier = Modifier.weight(1f)) { Text(t("qr_scan")) }
                             }
                         } else {
                             QrCodeCard(value = draft.qrValue, label = t("qr_code"), showValueText = false)
                             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                 FilledTonalButton(onClick = onPickQrCode, modifier = Modifier.weight(1f)) { Text(t("qr_change")) }
-                                FilledTonalButton(onClick = { qrCamera.launch() }, modifier = Modifier.weight(1f)) { Text(t("qr_scan")) }
+                                FilledTonalButton(onClick = { qrCamera.launch(null) }, modifier = Modifier.weight(1f)) { Text(t("qr_scan")) }
                                 TextButton(onClick = onClearQr) { Text(t("qr_remove"), color = Color.White) }
                             }
                         }

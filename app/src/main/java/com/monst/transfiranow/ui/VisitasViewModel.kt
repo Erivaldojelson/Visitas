@@ -15,6 +15,7 @@ import com.monst.transfiranow.data.CardsUiState
 import com.monst.transfiranow.data.VisitingCard
 import com.monst.transfiranow.share.CardsBackup
 import com.monst.transfiranow.util.VCardParser
+import com.monst.transfiranow.widget.MyCardWidgetProvider
 import com.monst.transfiranow.wallet.WalletJwtClient
 import com.monst.transfiranow.wallet.WalletPassBuilder
 import com.google.zxing.BarcodeFormat
@@ -26,6 +27,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
@@ -59,6 +61,11 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
 
     fun updateDraft(transform: (CardDraft) -> CardDraft) {
         _uiState.update { it.copy(draft = transform(it.draft)) }
+    }
+
+    suspend fun getCardById(id: String): VisitingCard? {
+        if (id.isBlank()) return null
+        return store.uiStateFlow.first().cards.firstOrNull { it.id == id }
     }
 
     fun editCard(card: VisitingCard) {
@@ -201,10 +208,11 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
                 return@launch
             }
 
-            store.mergeCards(imported)
-            _uiState.update { it.copy(statusMessage = "Backup importado: ${imported.size} cartões mesclados.") }
-        }
-    }
+              store.mergeCards(imported)
+              MyCardWidgetProvider.requestUpdate(getApplication())
+              _uiState.update { it.copy(statusMessage = "Backup importado: ${imported.size} cartões mesclados.") }
+          }
+      }
 
     private fun handleScannedContent(content: String) {
         val trimmed = content.trim()
@@ -279,12 +287,13 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
             _uiState.update { it.copy(statusMessage = message(it.appLanguage, "need_name")) }
             return
         }
-        viewModelScope.launch {
-            store.saveCard(draft)
-            _uiState.update {
-                it.copy(
-                    draft = CardDraft(passColor = it.draft.passColor),
-                    statusMessage = message(it.appLanguage, "pass_saved")
+          viewModelScope.launch {
+              store.saveCard(draft)
+              MyCardWidgetProvider.requestUpdate(getApplication())
+              _uiState.update {
+                  it.copy(
+                      draft = CardDraft(passColor = it.draft.passColor),
+                      statusMessage = message(it.appLanguage, "pass_saved")
                 )
             }
         }
@@ -293,6 +302,7 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
     fun deleteCard(id: String) {
         viewModelScope.launch {
             store.deleteCard(id)
+            MyCardWidgetProvider.requestUpdate(getApplication())
             _uiState.update { it.copy(statusMessage = message(it.appLanguage, "pass_deleted")) }
         }
     }

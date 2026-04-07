@@ -1,4 +1,9 @@
 <resources>
     <string name="app_name">Visitas</string>
     <string name="add_to_google_wallet_button_content_description">Adicionar ao Google Wallet</string>
+
+    <string name="widget_title">Meu cartão</string>
+    <string name="widget_empty">Nenhum cartão salvo</string>
+    <string name="widget_open">Abrir</string>
+    <string name="widget_wallet">Salvar no Wallet</string>
 </resources>

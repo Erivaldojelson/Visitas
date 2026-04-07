@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:left="20dp" android:top="20dp">
+    <item android:left="20dp" android:top="26dp">
         <shape android:shape="rectangle">
             <size android:width="72dp" android:height="52dp" />
             <corners android:radius="18dp" />
@@ -8,7 +8,7 @@
         </shape>
     </item>
 
-    <item android:left="18dp" android:top="18dp">
+    <item android:left="18dp" android:top="24dp">
         <shape android:shape="rectangle">
             <size android:width="72dp" android:height="52dp" />
             <corners android:radius="18dp" />
@@ -19,7 +19,7 @@
         </shape>
     </item>
 
-    <item android:left="22dp" android:top="32dp">
+    <item android:left="22dp" android:top="38dp">
         <shape android:shape="rectangle">
             <size android:width="68dp" android:height="48dp" />
             <corners android:radius="16dp" />
@@ -27,7 +27,7 @@
         </shape>
     </item>
 
-    <item android:left="20dp" android:top="30dp">
+    <item android:left="20dp" android:top="36dp">
         <shape android:shape="rectangle">
             <size android:width="68dp" android:height="48dp" />
             <corners android:radius="16dp" />
@@ -38,7 +38,7 @@
         </shape>
     </item>
 
-    <item android:left="20dp" android:top="30dp">
+    <item android:left="20dp" android:top="36dp">
         <shape android:shape="rectangle">
             <size android:width="68dp" android:height="48dp" />
             <corners android:radius="16dp" />
@@ -52,35 +52,35 @@
         </shape>
     </item>
 
-    <item android:left="28dp" android:top="38dp">
+    <item android:left="28dp" android:top="44dp">
         <shape android:shape="rectangle">
             <size android:width="8dp" android:height="8dp" />
             <corners android:radius="2dp" />
             <solid android:color="#E6FFFFFF" />
         </shape>
     </item>
-    <item android:left="38dp" android:top="38dp">
+    <item android:left="38dp" android:top="44dp">
         <shape android:shape="rectangle">
             <size android:width="8dp" android:height="8dp" />
             <corners android:radius="2dp" />
             <solid android:color="#E6FFFFFF" />
         </shape>
     </item>
-    <item android:left="48dp" android:top="38dp">
+    <item android:left="48dp" android:top="44dp">
         <shape android:shape="rectangle">
             <size android:width="8dp" android:height="8dp" />
             <corners android:radius="2dp" />
             <solid android:color="#E6FFFFFF" />
         </shape>
     </item>
-    <item android:left="28dp" android:top="48dp">
+    <item android:left="28dp" android:top="54dp">
         <shape android:shape="rectangle">
             <size android:width="8dp" android:height="8dp" />
             <corners android:radius="2dp" />
             <solid android:color="#E6FFFFFF" />
         </shape>
     </item>
-    <item android:left="38dp" android:top="48dp">
+    <item android:left="38dp" android:top="54dp">
         <shape android:shape="rectangle">
             <size android:width="8dp" android:height="8dp" />
             <corners android:radius="2dp" />
@@ -90,11 +90,11 @@
 
     <item
         android:left="58dp"
-        android:top="45dp"
+        android:top="51dp"
         android:drawable="@drawable/ic_launcher_mark_shadow" />
 
     <item
         android:left="57dp"
-        android:top="44dp"
+        android:top="50dp"
         android:drawable="@drawable/ic_launcher_mark" />
 </layer-list>
