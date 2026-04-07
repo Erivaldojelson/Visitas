@@ -2,7 +2,6 @@ package com.monst.transfiranow.premium
 
 import android.content.Intent
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.enableEdgeToEdge
@@ -10,6 +9,8 @@ import androidx.activity.viewModels
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
 import androidx.core.view.WindowCompat
+import androidx.fragment.app.FragmentActivity
+import com.monst.transfiranow.ui.AppLockGate
 import com.google.android.gms.pay.Pay
 import com.google.android.gms.pay.PayClient
 import com.google.android.gms.pay.PayClient.SavePassesResult
@@ -17,7 +18,7 @@ import com.monst.transfiranow.ui.VisitasViewModel
 import com.monst.transfiranow.ui.theme.TransfiraNowTheme
 import com.monst.transfiranow.util.parseColor
 
-class PremiumCardsActivity : ComponentActivity() {
+class PremiumCardsActivity : FragmentActivity() {
     private lateinit var walletClient: PayClient
     private val viewModel: VisitasViewModel by viewModels()
 
@@ -40,17 +41,19 @@ class PremiumCardsActivity : ComponentActivity() {
         setContent {
             val uiState by viewModel.uiState.collectAsState()
             TransfiraNowTheme(dynamicColor = true, accentColor = parseColor(uiState.draft.passColor)) {
-                PremiumNavHost(
-                    viewModel = viewModel,
-                    onPickPhoto = { photoPicker.launch(arrayOf("image/*")) },
-                    onPickQrCode = { qrPicker.launch(arrayOf("image/*")) },
-                    onSaveToWallet = { card ->
-                        viewModel.prepareWalletJwt(card) { jwt ->
-                            walletClient.savePassesJwt(jwt, this, ADD_TO_WALLET_REQUEST_CODE)
-                        }
-                    },
-                    onClose = { finish() }
-                )
+                AppLockGate(enabled = uiState.appLockEnabled) {
+                    PremiumNavHost(
+                        viewModel = viewModel,
+                        onPickPhoto = { photoPicker.launch(arrayOf("image/*")) },
+                        onPickQrCode = { qrPicker.launch(arrayOf("image/*")) },
+                        onSaveToWallet = { card ->
+                            viewModel.prepareWalletJwt(card) { jwt ->
+                                walletClient.savePassesJwt(jwt, this, ADD_TO_WALLET_REQUEST_CODE)
+                            }
+                        },
+                        onClose = { finish() }
+                    )
+                }
             }
         }
 

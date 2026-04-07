@@ -2,6 +2,7 @@ package com.monst.transfiranow.data
 
 import android.content.Context
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.first
@@ -19,6 +20,7 @@ class CardStore(private val context: Context) {
     private val classSuffixKey = stringPreferencesKey("wallet_class_suffix")
     private val backendUrlKey = stringPreferencesKey("wallet_backend_url")
     private val languageKey = stringPreferencesKey("app_language")
+    private val appLockKey = booleanPreferencesKey("app_lock_enabled")
 
     val uiStateFlow: Flow<CardsUiState> = context.dataStore.data.map { preferences ->
         CardsUiState(
@@ -26,7 +28,8 @@ class CardStore(private val context: Context) {
             walletIssuerId = preferences[issuerKey].orEmpty(),
             walletClassSuffix = preferences[classSuffixKey] ?: "visitas_card",
             walletBackendUrl = preferences[backendUrlKey].orEmpty(),
-            appLanguage = AppLanguage.fromCode(preferences[languageKey].orEmpty())
+            appLanguage = AppLanguage.fromCode(preferences[languageKey].orEmpty()),
+            appLockEnabled = preferences[appLockKey] ?: false
         )
     }
 
@@ -69,6 +72,12 @@ class CardStore(private val context: Context) {
     suspend fun persistLanguage(language: AppLanguage) {
         context.dataStore.edit { preferences ->
             preferences[languageKey] = language.code
+        }
+    }
+
+    suspend fun persistAppLockEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[appLockKey] = enabled
         }
     }
 

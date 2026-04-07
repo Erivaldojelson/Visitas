@@ -3,12 +3,12 @@ package com.monst.transfiranow
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
+import androidx.fragment.app.FragmentActivity
 import com.google.android.gms.pay.Pay
 import com.google.android.gms.pay.PayApiAvailabilityStatus
 import com.google.android.gms.pay.PayClient
@@ -16,7 +16,7 @@ import com.monst.transfiranow.ui.VisitasApp
 import com.monst.transfiranow.ui.VisitasViewModel
 import kotlinx.coroutines.launch
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
     private lateinit var walletClient: PayClient
     private val viewModel: VisitasViewModel by viewModels()
     private val photoPicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->

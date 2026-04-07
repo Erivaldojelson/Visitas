@@ -1,5 +1,11 @@
 # Changelog
 
+## Visitas 1.8.4 - 2026-04-07
+
+- Ajuste de espaçamento no topo: botão de voltar e cartão não encostam mais na barra de status.
+- Bloqueio do app com biometria (impressão digital) com opção em Configurações.
+- Layout adaptativo para telas grandes (tablet/dobráveis) e telas externas menores (ex.: Z Flip).
+
 ## Visitas 1.8.3 - 2026-04-07
 
 - Tela de detalhes sem título no topo e sem texto “Voltar” (apenas botão circular transparente).

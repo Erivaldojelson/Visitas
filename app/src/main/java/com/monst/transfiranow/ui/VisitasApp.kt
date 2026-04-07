@@ -9,6 +9,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.BackHandler
+import androidx.biometric.BiometricManager
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SizeTransform
@@ -41,6 +42,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -48,7 +50,9 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -78,6 +82,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextFieldDefaults
@@ -106,6 +111,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -134,6 +140,12 @@ import kotlin.random.Random
 private enum class AppTab { HOME, CREATE, SAVED, SETTINGS }
 private enum class OverlayScreen { MAIN, DETAILS_SAVED, DETAILS_DRAFT }
 
+private fun adaptiveSidePadding(maxWidth: Dp, maxContentWidth: Dp, minPadding: Dp = 16.dp): Dp {
+    if (maxWidth <= maxContentWidth) return minPadding
+    val extra = (maxWidth - maxContentWidth) / 2f
+    return if (extra > minPadding) extra else minPadding
+}
+
 @Composable
 fun VisitasApp(
     onPickPhoto: () -> Unit,
@@ -156,10 +168,11 @@ fun VisitasApp(
     }
     val themeAccent = parseColor(detailsCard?.passColor ?: uiState.draft.passColor)
     TransfiraNowTheme(dynamicColor = true, accentColor = themeAccent) {
-        Box(Modifier.fillMaxSize()) {
-            AnimatedContent(
-                targetState = overlayScreen,
-                transitionSpec = {
+        AppLockGate(enabled = uiState.appLockEnabled) {
+            Box(Modifier.fillMaxSize()) {
+                AnimatedContent(
+                    targetState = overlayScreen,
+                    transitionSpec = {
                     val forward = initialState == OverlayScreen.MAIN && targetState != OverlayScreen.MAIN
 
                     val enterSpring = spring<Float>(
@@ -276,12 +289,14 @@ fun VisitasApp(
                                     padding = padding,
                                     cards = uiState.cards,
                                     currentLanguage = uiState.appLanguage,
+                                    appLockEnabled = uiState.appLockEnabled,
                                     canUseGoogleWallet = uiState.canUseGoogleWallet,
                                     walletIssuerId = uiState.walletIssuerId,
                                     walletClassSuffix = uiState.walletClassSuffix,
                                     walletBackendUrl = uiState.walletBackendUrl,
                                     t = t,
                                     onLanguageSelected = viewModel::updateLanguage,
+                                    onAppLockEnabledChange = viewModel::setAppLockEnabled,
                                     onWalletSettingsChange = viewModel::updateWalletSettings,
                                     onPersistWalletSettings = viewModel::persistWalletSettings,
                                     onImportBackup = viewModel::importBackupFromUri
@@ -336,23 +351,36 @@ fun VisitasApp(
                 }
             }
 
-            ColorfulLoadingOverlay(
-                visible = showColorfulOverlay,
-                message = "gerar o cartão",
-                accentColor = parseColor(uiState.draft.passColor)
-            )
+                ColorfulLoadingOverlay(
+                    visible = showColorfulOverlay,
+                    message = "gerar o cartão",
+                    accentColor = parseColor(uiState.draft.passColor)
+                )
+            }
         }
     }
 }
 
 @Composable
 private fun PillBar(selected: AppTab, t: (String) -> String, onSelect: (AppTab) -> Unit) {
-    Surface(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 10.dp), shape = RoundedCornerShape(999.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
-        Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 6.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            PillItem(AppTab.HOME, selected, t("home"), Icons.Rounded.Home, onSelect)
-            PillItem(AppTab.CREATE, selected, t("create"), Icons.Rounded.Add, onSelect)
-            PillItem(AppTab.SAVED, selected, t("saved"), Icons.Rounded.Style, onSelect)
-            PillItem(AppTab.SETTINGS, selected, t("settings"), Icons.Rounded.Settings, onSelect)
+    BoxWithConstraints(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 10.dp)) {
+        Surface(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .widthIn(max = 640.dp)
+                .fillMaxWidth(),
+            shape = RoundedCornerShape(999.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh
+        ) {
+            Row(
+                Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 6.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                PillItem(AppTab.HOME, selected, t("home"), Icons.Rounded.Home, onSelect)
+                PillItem(AppTab.CREATE, selected, t("create"), Icons.Rounded.Add, onSelect)
+                PillItem(AppTab.SAVED, selected, t("saved"), Icons.Rounded.Style, onSelect)
+                PillItem(AppTab.SETTINGS, selected, t("settings"), Icons.Rounded.Settings, onSelect)
+            }
         }
     }
 }
@@ -370,17 +398,27 @@ private fun RowScope.PillItem(tab: AppTab, selected: AppTab, label: String, icon
 
 @Composable
 private fun CardsScreen(padding: PaddingValues, title: String, subtitle: String, message: String, cards: List<VisitingCard>, t: (String) -> String, showDelete: Boolean, onSaveToWallet: (VisitingCard) -> Unit, onDelete: (VisitingCard) -> Unit, onEdit: (VisitingCard) -> Unit, onOpenDetails: (VisitingCard) -> Unit) {
-    LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 120.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-        item { ListHeader(title = title, subtitle = subtitle, message = message) }
-        if (cards.isEmpty()) item { EmptyCard(t(if (showDelete) "saved_empty_title" else "home_empty_title"), t(if (showDelete) "saved_empty_body" else "home_empty_body")) }
-        else items(cards, key = { it.id }) { card -> SavedPassCard(card, t, showDelete, { onEdit(card) }, { onDelete(card) }, { onSaveToWallet(card) }, { onOpenDetails(card) }) }
+    BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
+        val side = adaptiveSidePadding(maxWidth, maxContentWidth = 720.dp)
+        LazyColumn(
+            Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(side, 16.dp, side, 120.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp)
+        ) {
+            item { ListHeader(title = title, subtitle = subtitle, message = message) }
+            if (cards.isEmpty()) item { EmptyCard(t(if (showDelete) "saved_empty_title" else "home_empty_title"), t(if (showDelete) "saved_empty_body" else "home_empty_body")) }
+            else items(cards, key = { it.id }) { card -> SavedPassCard(card, t, showDelete, { onEdit(card) }, { onDelete(card) }, { onSaveToWallet(card) }, { onOpenDetails(card) }) }
+        }
     }
 }
 
 @Composable
 private fun ListHeader(title: String, subtitle: String, message: String) {
+    val config = androidx.compose.ui.platform.LocalConfiguration.current
+    val compact = config.screenHeightDp < 620 || config.screenWidthDp < 360
+
     Column(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(title, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold)
+        Text(title, style = if (compact) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold)
         if (subtitle.isNotBlank()) Text(subtitle, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (message.isNotBlank()) Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
     }
@@ -407,27 +445,34 @@ private fun CreateScreen(
     onClearQr: () -> Unit,
     onOpenDraftDetails: () -> Unit
 ) {
-    LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 120.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-        item {
-            CreateInvitesEditorCard(
-                draft = draft,
-                canUseGoogleWallet = canUseGoogleWallet,
-                walletIssuerId = walletIssuerId,
-                walletClassSuffix = walletClassSuffix,
-                walletBackendUrl = walletBackendUrl,
-                t = t,
-                onPickPhoto = onPickPhoto,
-                onPickQrCode = onPickQrCode,
-                onScanQrFromBitmap = onScanQrFromBitmap,
-                onImportVCard = onImportVCard,
-                onDraftChange = onDraftChange,
-                onWalletSettingsChange = onWalletSettingsChange,
-                onCreatePass = onCreatePass,
-                onPersistWalletSettings = onPersistWalletSettings,
-                onClearDraft = onClearDraft,
-                onClearQr = onClearQr,
-                onOpenDraftDetails = onOpenDraftDetails
-            )
+    BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
+        val side = adaptiveSidePadding(maxWidth, maxContentWidth = 720.dp)
+        LazyColumn(
+            Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(side, 16.dp, side, 120.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp)
+        ) {
+            item {
+                CreateInvitesEditorCard(
+                    draft = draft,
+                    canUseGoogleWallet = canUseGoogleWallet,
+                    walletIssuerId = walletIssuerId,
+                    walletClassSuffix = walletClassSuffix,
+                    walletBackendUrl = walletBackendUrl,
+                    t = t,
+                    onPickPhoto = onPickPhoto,
+                    onPickQrCode = onPickQrCode,
+                    onScanQrFromBitmap = onScanQrFromBitmap,
+                    onImportVCard = onImportVCard,
+                    onDraftChange = onDraftChange,
+                    onWalletSettingsChange = onWalletSettingsChange,
+                    onCreatePass = onCreatePass,
+                    onPersistWalletSettings = onPersistWalletSettings,
+                    onClearDraft = onClearDraft,
+                    onClearQr = onClearQr,
+                    onOpenDraftDetails = onOpenDraftDetails
+                )
+            }
         }
     }
 }
@@ -683,12 +728,14 @@ private fun SettingsScreen(
     padding: PaddingValues,
     cards: List<VisitingCard>,
     currentLanguage: AppLanguage,
+    appLockEnabled: Boolean,
     canUseGoogleWallet: Boolean,
     walletIssuerId: String,
     walletClassSuffix: String,
     walletBackendUrl: String,
     t: (String) -> String,
     onLanguageSelected: (AppLanguage) -> Unit,
+    onAppLockEnabledChange: (Boolean) -> Unit,
     onWalletSettingsChange: (String?, String?, String?) -> Unit,
     onPersistWalletSettings: () -> Unit,
     onImportBackup: (Uri) -> Unit
@@ -699,68 +746,121 @@ private fun SettingsScreen(
         uri ?: return@rememberLauncherForActivityResult
         onImportBackup(uri)
     }
-    LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 120.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-        item { Hero(t("settings_head"), t("settings_sub"), "${t("version")}: ${BuildConfig.VERSION_NAME}") }
-        item {
-            ElevatedCard(shape = RoundedCornerShape(28.dp)) {
-                Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) { Icon(Icons.Rounded.Language, null); Text(t("language"), style = MaterialTheme.typography.titleLarge) }
-                    listOf(AppLanguage.PT_BR to "Português (Brasil)", AppLanguage.PT_PT to "Português (Portugal)", AppLanguage.PT_AO to "Português (Angola)", AppLanguage.EN to "English", AppLanguage.ZH to "中文").forEach { (lang, label) ->
-                        FilterChip(selected = currentLanguage == lang, onClick = { onLanguageSelected(lang) }, label = { Text(label) })
+    BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
+        val side = adaptiveSidePadding(maxWidth, maxContentWidth = 720.dp)
+        LazyColumn(
+            Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(side, 16.dp, side, 120.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp)
+        ) {
+            item { Hero(t("settings_head"), t("settings_sub"), "${t("version")}: ${BuildConfig.VERSION_NAME}") }
+            item {
+                ElevatedCard(shape = RoundedCornerShape(28.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) { Icon(Icons.Rounded.Language, null); Text(t("language"), style = MaterialTheme.typography.titleLarge) }
+                        listOf(AppLanguage.PT_BR to "Português (Brasil)", AppLanguage.PT_PT to "Português (Portugal)", AppLanguage.PT_AO to "Português (Angola)", AppLanguage.EN to "English", AppLanguage.ZH to "中文").forEach { (lang, label) ->
+                            FilterChip(selected = currentLanguage == lang, onClick = { onLanguageSelected(lang) }, label = { Text(label) })
+                        }
                     }
                 }
             }
-        }
-        item {
-            ElevatedCard(shape = RoundedCornerShape(28.dp)) {
-                Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("UI", style = MaterialTheme.typography.titleLarge)
-                    Text(t("premium_ui_hint"), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    FilledTonalButton(onClick = { context.startActivity(Intent(context, PremiumCardsActivity::class.java)) }) {
-                        Text(t("premium_ui_open"))
-                    }
+            item {
+                val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
+                val canUseBiometric = remember {
+                    BiometricManager.from(context).canAuthenticate(authenticators) == BiometricManager.BIOMETRIC_SUCCESS
                 }
-            }
-        }
-        item { WalletCard(canUseGoogleWallet, walletIssuerId, walletClassSuffix, walletBackendUrl, t, onWalletSettingsChange, onPersistWalletSettings) }
-        item {
-            ElevatedCard(shape = RoundedCornerShape(28.dp)) {
-                Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(t("backup"), style = MaterialTheme.typography.titleLarge)
-                    Text("${cards.size} ${t("saved_count")}", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        FilledTonalButton(
-                            onClick = {
-                                scope.launch {
-                                    runCatching {
-                                        val uri = withContext(Dispatchers.IO) { CardsBackup.exportJson(context, cards) }
-                                        shareFile(context, uri, "application/json", t("backup"))
-                                    }.onFailure { error ->
-                                        showToast(context, error.message ?: "Falha ao exportar backup.")
-                                    }
+                ElevatedCard(shape = RoundedCornerShape(28.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("Segurança", style = MaterialTheme.typography.titleLarge)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text("Bloquear o app com biometria", style = MaterialTheme.typography.titleMedium)
+                                Text(
+                                    "Ao abrir pelo ícone/atalhos/notificações, pede impressão digital para continuar.",
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                if (!canUseBiometric) {
+                                    Text(
+                                        "Biometria indisponível neste dispositivo.",
+                                        color = MaterialTheme.colorScheme.error,
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
                                 }
-                            },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text(t("backup_export"))
-                        }
-                        FilledTonalButton(
-                            onClick = { backupPicker.launch(arrayOf("application/json", "text/plain", "*/*")) },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text(t("backup_import"))
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Switch(
+                                checked = appLockEnabled,
+                                onCheckedChange = { enabled ->
+                                    if (!enabled) {
+                                        onAppLockEnabledChange(false)
+                                    } else if (!canUseBiometric) {
+                                        Toast.makeText(context, "Biometria indisponível neste dispositivo.", Toast.LENGTH_LONG).show()
+                                    } else {
+                                        onAppLockEnabledChange(true)
+                                    }
+                                },
+                                enabled = canUseBiometric
+                            )
                         }
                     }
                 }
             }
-        }
-        item {
-            ElevatedCard(shape = RoundedCornerShape(28.dp)) {
-                Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(t("version"), style = MaterialTheme.typography.titleMedium)
-                    Text(BuildConfig.VERSION_NAME)
-                    Text(t("github"), style = MaterialTheme.typography.titleMedium)
-                    Text("Erivaldojelson")
+            item {
+                ElevatedCard(shape = RoundedCornerShape(28.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("UI", style = MaterialTheme.typography.titleLarge)
+                        Text(t("premium_ui_hint"), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        FilledTonalButton(onClick = { context.startActivity(Intent(context, PremiumCardsActivity::class.java)) }) {
+                            Text(t("premium_ui_open"))
+                        }
+                    }
+                }
+            }
+            item { WalletCard(canUseGoogleWallet, walletIssuerId, walletClassSuffix, walletBackendUrl, t, onWalletSettingsChange, onPersistWalletSettings) }
+            item {
+                ElevatedCard(shape = RoundedCornerShape(28.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(t("backup"), style = MaterialTheme.typography.titleLarge)
+                        Text("${cards.size} ${t("saved_count")}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            FilledTonalButton(
+                                onClick = {
+                                    scope.launch {
+                                        runCatching {
+                                            val uri = withContext(Dispatchers.IO) { CardsBackup.exportJson(context, cards) }
+                                            shareFile(context, uri, "application/json", t("backup"))
+                                        }.onFailure { error ->
+                                            showToast(context, error.message ?: "Falha ao exportar backup.")
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(t("backup_export"))
+                            }
+                            FilledTonalButton(
+                                onClick = { backupPicker.launch(arrayOf("application/json", "text/plain", "*/*")) },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(t("backup_import"))
+                            }
+                        }
+                    }
+                }
+            }
+            item {
+                ElevatedCard(shape = RoundedCornerShape(28.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(t("version"), style = MaterialTheme.typography.titleMedium)
+                        Text(BuildConfig.VERSION_NAME)
+                        Text(t("github"), style = MaterialTheme.typography.titleMedium)
+                        Text("Erivaldojelson")
+                    }
                 }
             }
         }
@@ -1078,53 +1178,60 @@ private fun PassDetailsScreen(
         Scaffold(
             containerColor = Color.Transparent,
             topBar = {
-                Box(
+                BoxWithConstraints(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 10.dp)
+                        .statusBarsPadding()
+                        .padding(vertical = 10.dp)
                 ) {
-                    Surface(
-                        onClick = onBack,
-                        modifier = Modifier.size(44.dp),
-                        shape = CircleShape,
-                        color = Color.Transparent,
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.22f))
-                    ) {
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null, tint = Color.White)
+                    val side = adaptiveSidePadding(maxWidth, maxContentWidth = 560.dp)
+                    Box(Modifier.fillMaxWidth().padding(horizontal = side)) {
+                        Surface(
+                            onClick = onBack,
+                            modifier = Modifier.size(44.dp),
+                            shape = CircleShape,
+                            color = Color.Transparent,
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.22f))
+                        ) {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null, tint = Color.White)
+                            }
                         }
                     }
                 }
             }
         ) { padding ->
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentPadding = PaddingValues(16.dp, 12.dp, 16.dp, 28.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                item {
-                    AnimatedVisibility(
-                        visible = visible,
-                        enter = fadeIn(tween(180)) + scaleIn(
-                            animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow),
-                            initialScale = 0.92f
-                        ),
-                        exit = fadeOut(tween(140)) + scaleOut(
-                            animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
-                            targetScale = 0.985f
-                        )
-                    ) {
-                        PassExpandedCard(
-                            accentColor = accentColor,
-                            photoUri = photoUri,
-                            badgeText = badgeText,
-                            title = title,
-                            subtitle = subtitle,
-                            tertiary = tertiary,
-                            lines = lines,
-                            qrValue = qrValue,
-                            qrLabel = qrLabel
-                        )
+            BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
+                val side = adaptiveSidePadding(maxWidth, maxContentWidth = 560.dp)
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(side, 20.dp, side, 28.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    item {
+                        AnimatedVisibility(
+                            visible = visible,
+                            enter = fadeIn(tween(180)) + scaleIn(
+                                animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow),
+                                initialScale = 0.92f
+                            ),
+                            exit = fadeOut(tween(140)) + scaleOut(
+                                animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
+                                targetScale = 0.985f
+                            )
+                        ) {
+                            PassExpandedCard(
+                                accentColor = accentColor,
+                                photoUri = photoUri,
+                                badgeText = badgeText,
+                                title = title,
+                                subtitle = subtitle,
+                                tertiary = tertiary,
+                                lines = lines,
+                                qrValue = qrValue,
+                                qrLabel = qrLabel
+                            )
+                        }
                     }
                 }
             }

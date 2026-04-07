@@ -12,8 +12,8 @@ android {
         applicationId = "com.monst.transfiranow"
         minSdk = 29
         targetSdk = 35
-        versionCode = 14
-        versionName = "1.8.3"
+        versionCode = 15
+        versionName = "1.8.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -88,6 +88,7 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.8.4")
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("androidx.core:core-splashscreen:1.0.1")
+    implementation("androidx.biometric:biometric:1.1.0")
     implementation("com.google.android.material:material:1.12.0")
     implementation("com.google.android.gms:play-services-pay:16.5.0")
     implementation("com.google.zxing:core:3.5.3")

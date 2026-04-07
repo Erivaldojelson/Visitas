@@ -48,6 +48,7 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
                         walletClassSuffix = persisted.walletClassSuffix,
                         walletBackendUrl = persisted.walletBackendUrl,
                         appLanguage = persisted.appLanguage,
+                        appLockEnabled = persisted.appLockEnabled,
                         statusMessage = if (it.statusMessage == CardsUiState().statusMessage) {
                             message(persisted.appLanguage, "create_intro")
                         } else {
@@ -273,6 +274,13 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
         }
         viewModelScope.launch {
             store.persistLanguage(language)
+        }
+    }
+
+    fun setAppLockEnabled(enabled: Boolean) {
+        _uiState.update { it.copy(appLockEnabled = enabled) }
+        viewModelScope.launch {
+            store.persistAppLockEnabled(enabled)
         }
     }
 
