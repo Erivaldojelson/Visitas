@@ -9,11 +9,13 @@ import android.os.Build
 import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import com.monst.transfiranow.MainActivity
 import com.monst.transfiranow.R
 
 object AppNotifications {
     private const val CHANNEL_UPDATES = "visitas_updates"
+    private const val CHANNEL_EVENT = "visitas_event"
 
     private const val NOTIFICATION_ID_CARD_STATUS = 2410
 
@@ -29,6 +31,18 @@ object AppNotifications {
             description = "Avisos do Transfira Now (criação de cartões e Live Updates)."
         }
         manager.createNotificationChannel(channel)
+
+        val eventChannel = NotificationChannel(
+            CHANNEL_EVENT,
+            "Modo Evento",
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = "Atividades em andamento (Now Bar/Live notifications)."
+            setSound(null, null)
+            enableVibration(false)
+            setShowBadge(false)
+        }
+        manager.createNotificationChannel(eventChannel)
     }
 
     fun canPostNotifications(context: Context): Boolean {
@@ -108,6 +122,26 @@ object AppNotifications {
         } else {
             openAppNotificationSettings(context)
         }
+    }
+
+    fun startEventMode(
+        context: Context,
+        title: String = "Modo Evento Ativo",
+        text: String = "Seu cartão está pronto para compartilhar",
+        durationMs: Long = 59L * 60L * 1000L
+    ) {
+        ensureChannels(context)
+        val intent = Intent(context, EventModeService::class.java).apply {
+            putExtra(EventModeService.EXTRA_TITLE, title)
+            putExtra(EventModeService.EXTRA_TEXT, text)
+            putExtra(EventModeService.EXTRA_DURATION_MS, durationMs)
+        }
+        ContextCompat.startForegroundService(context, intent)
+    }
+
+    fun stopEventMode(context: Context) {
+        val intent = Intent(context, EventModeService::class.java).setAction(EventModeService.ACTION_STOP)
+        runCatching { context.startService(intent) }
     }
 
     private fun startIntentSafely(context: Context, intent: Intent) {

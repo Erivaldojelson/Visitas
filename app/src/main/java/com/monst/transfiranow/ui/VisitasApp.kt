@@ -282,18 +282,27 @@ fun VisitasApp(
 
                                             showColorfulOverlay = true
                                             job.join()
-                                            delay(1100)
-                                             showColorfulOverlay = false
+                                             delay(1100)
+                                              showColorfulOverlay = false
 
-                                             if (shouldNotify) {
-                                                 AppNotifications.postCardGenerationCompleted(
-                                                     context,
-                                                     cardName,
-                                                     requestPromoted = requestPromoted
-                                                 )
-                                             }
-                                         }
-                                     },
+                                              if (shouldNotify) {
+                                                  if (uiState.liveUpdatesEnabled) {
+                                                      AppNotifications.cancelCardStatus(context)
+                                                      AppNotifications.startEventMode(
+                                                          context,
+                                                          title = "Modo Evento Ativo",
+                                                          text = cardName.ifBlank { "Seu cartão está pronto para compartilhar" }
+                                                      )
+                                                  } else {
+                                                      AppNotifications.postCardGenerationCompleted(
+                                                          context,
+                                                          cardName,
+                                                          requestPromoted = false
+                                                      )
+                                                  }
+                                              }
+                                          }
+                                      },
                                     onPersistWalletSettings = viewModel::persistWalletSettings,
                                     onClearDraft = viewModel::clearDraft,
                                     onClearQr = viewModel::clearDraftQr,
@@ -1064,40 +1073,44 @@ private fun SettingsScreen(
                         }
 
                         if (notificationsEnabled && hasNotificationPermission && systemNotificationsEnabled) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                FilledTonalButton(
-                                    onClick = {
-                                        AppNotifications.postCardGenerationCompleted(context, "Cartão de teste")
-                                    },
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Text("Testar notificação")
-                                }
-                                FilledTonalButton(
-                                    onClick = {
-                                        scope.launch {
-                                            AppNotifications.postCardGenerationLiveUpdate(
-                                                context,
-                                                "Cartão de teste",
-                                                criticalText = "Teste",
-                                                requestPromoted = true
-                                            )
-                                            delay(400)
-                                            if (!canPromote) {
-                                                AppNotifications.openAppNotificationPromotionSettings(context)
+                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    FilledTonalButton(
+                                        onClick = {
+                                            AppNotifications.postCardGenerationCompleted(context, "Cartão de teste")
+                                        },
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text("Testar notificação")
+                                    }
+                                    FilledTonalButton(
+                                        onClick = {
+                                            scope.launch {
+                                                AppNotifications.startEventMode(
+                                                    context,
+                                                    title = "Modo Evento Ativo",
+                                                    text = "Cartão de teste (Live Update)"
+                                                )
+                                                delay(400)
+                                                if (!canPromote) {
+                                                    AppNotifications.openAppNotificationPromotionSettings(context)
+                                                }
                                             }
-                                            delay(2000)
-                                            AppNotifications.postCardGenerationCompleted(
-                                                context,
-                                                "Cartão de teste",
-                                                requestPromoted = true
-                                            )
-                                        }
-                                    },
-                                    modifier = Modifier.weight(1f),
-                                    enabled = isAndroid16 && liveUpdatesEnabled
-                                ) {
-                                    Text("Testar Live Update")
+                                        },
+                                        modifier = Modifier.weight(1f),
+                                        enabled = isAndroid16 && liveUpdatesEnabled
+                                    ) {
+                                        Text("Iniciar Modo Evento")
+                                    }
+                                }
+
+                                if (isAndroid16) {
+                                    TextButton(
+                                        onClick = { AppNotifications.stopEventMode(context) },
+                                        enabled = liveUpdatesEnabled
+                                    ) {
+                                        Text("Encerrar Modo Evento")
+                                    }
                                 }
                             }
                         }
