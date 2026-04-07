@@ -13,6 +13,8 @@ import com.monst.transfiranow.data.CardDraft
 import com.monst.transfiranow.data.CardStore
 import com.monst.transfiranow.data.CardsUiState
 import com.monst.transfiranow.data.VisitingCard
+import com.monst.transfiranow.share.CardsBackup
+import com.monst.transfiranow.util.VCardParser
 import com.monst.transfiranow.wallet.WalletJwtClient
 import com.monst.transfiranow.wallet.WalletPassBuilder
 import com.google.zxing.BarcodeFormat
@@ -20,10 +22,12 @@ import com.google.zxing.BinaryBitmap
 import com.google.zxing.MultiFormatReader
 import com.google.zxing.common.HybridBinarizer
 import com.google.zxing.RGBLuminanceSource
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 
 class VisitasViewModel(application: Application) : AndroidViewModel(application) {
@@ -127,7 +131,119 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
             return
         }
 
-        updateDraftQrValue(decoded)
+        handleScannedContent(decoded)
+    }
+
+    fun scanQrFromBitmap(bitmap: Bitmap) {
+        val decoded = decodeQrFromBitmap(bitmap)
+        if (decoded == null) {
+            Toast.makeText(getApplication(), "Não foi possível ler um QR Code com essa imagem.", Toast.LENGTH_LONG).show()
+            return
+        }
+        handleScannedContent(decoded)
+    }
+
+    fun importVCardFromUri(uri: Uri) {
+        viewModelScope.launch {
+            val content = withContext(Dispatchers.IO) {
+                runCatching {
+                    getApplication<Application>().contentResolver.openInputStream(uri)?.use { stream ->
+                        stream.bufferedReader().readText()
+                    }.orEmpty()
+                }.getOrDefault("")
+            }
+
+            if (content.isBlank()) {
+                _uiState.update { it.copy(statusMessage = "Não foi possível ler o arquivo vCard.") }
+                return@launch
+            }
+
+            val parsed = VCardParser.parse(content)
+            if (parsed == null || parsed.fullName.isBlank()) {
+                _uiState.update { it.copy(statusMessage = "Esse arquivo não parece ser um vCard válido.") }
+                return@launch
+            }
+
+            _uiState.update {
+                it.copy(
+                    draft = it.draft.copy(
+                        name = parsed.fullName.ifBlank { it.draft.name },
+                        role = parsed.title.ifBlank { it.draft.role },
+                        phone = parsed.phone.ifBlank { it.draft.phone },
+                        email = parsed.email.ifBlank { it.draft.email },
+                        website = parsed.url.ifBlank { it.draft.website },
+                        note = listOf(it.draft.note, parsed.note).filter { v -> v.isNotBlank() }.distinct().joinToString("\n\n")
+                    ),
+                    statusMessage = "vCard importado. Revise e toque em “Criar passe”."
+                )
+            }
+        }
+    }
+
+    fun importBackupFromUri(uri: Uri) {
+        viewModelScope.launch {
+            val content = withContext(Dispatchers.IO) {
+                runCatching {
+                    getApplication<Application>().contentResolver.openInputStream(uri)?.use { stream ->
+                        stream.bufferedReader().readText()
+                    }.orEmpty()
+                }.getOrDefault("")
+            }
+
+            if (content.isBlank()) {
+                _uiState.update { it.copy(statusMessage = "Não foi possível ler o arquivo de backup.") }
+                return@launch
+            }
+
+            val imported = CardsBackup.parseCards(content)
+            if (imported.isEmpty()) {
+                _uiState.update { it.copy(statusMessage = "Nenhum cartão encontrado nesse backup.") }
+                return@launch
+            }
+
+            store.mergeCards(imported)
+            _uiState.update { it.copy(statusMessage = "Backup importado: ${imported.size} cartões mesclados.") }
+        }
+    }
+
+    private fun handleScannedContent(content: String) {
+        val trimmed = content.trim()
+        if (trimmed.isBlank()) return
+
+        VCardParser.parse(trimmed)?.let { parsed ->
+            if (parsed.fullName.isNotBlank()) {
+                _uiState.update {
+                    it.copy(
+                        draft = it.draft.copy(
+                            name = parsed.fullName.ifBlank { it.draft.name },
+                            role = parsed.title.ifBlank { it.draft.role },
+                            phone = parsed.phone.ifBlank { it.draft.phone },
+                            email = parsed.email.ifBlank { it.draft.email },
+                            website = parsed.url.ifBlank { it.draft.website },
+                            note = listOf(it.draft.note, parsed.note).filter { v -> v.isNotBlank() }.distinct().joinToString("\n\n"),
+                            qrValue = it.draft.qrValue.ifBlank { parsed.url.ifBlank { it.draft.qrValue } }
+                        ),
+                        statusMessage = "QR com vCard lido. Revise e toque em “Criar passe”."
+                    )
+                }
+                return
+            }
+        }
+
+        if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+            _uiState.update {
+                it.copy(
+                    draft = it.draft.copy(
+                        website = it.draft.website.ifBlank { trimmed },
+                        qrValue = trimmed
+                    ),
+                    statusMessage = "Link do QR adicionado ao cartão."
+                )
+            }
+            return
+        }
+
+        updateDraftQrValue(trimmed)
     }
 
     fun updateWalletSettings(issuerId: String? = null, classSuffix: String? = null, backendUrl: String? = null) {

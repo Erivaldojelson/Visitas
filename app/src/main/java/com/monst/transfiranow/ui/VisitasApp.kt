@@ -1,8 +1,13 @@
 package com.monst.transfiranow.ui
 
 import android.graphics.Bitmap
+import android.content.Intent
 import android.net.Uri
+import android.provider.ContactsContract
 import android.widget.ImageView
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SizeTransform
@@ -44,10 +49,13 @@ import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Save
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Style
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
@@ -64,6 +72,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -82,7 +91,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
-import android.content.Intent
 import coil.compose.AsyncImage
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
@@ -92,7 +100,12 @@ import com.monst.transfiranow.data.AppLanguage
 import com.monst.transfiranow.data.CardDraft
 import com.monst.transfiranow.data.VisitingCard
 import com.monst.transfiranow.premium.PremiumCardsActivity
+import com.monst.transfiranow.share.CardExport
+import com.monst.transfiranow.share.CardsBackup
 import com.monst.transfiranow.ui.theme.TransfiraNowTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private enum class AppTab { HOME, CREATE, SAVED, SETTINGS }
 
@@ -115,11 +128,42 @@ fun VisitasApp(
                 AppTab.HOME -> CardsScreen(padding, t("home_head"), "", "", uiState.cards.take(10), t, false, onSaveToWallet, {}) {
                     viewModel.editCard(it); tab = AppTab.CREATE
                 }
-                AppTab.CREATE -> CreateScreen(padding, uiState.draft, uiState.canUseGoogleWallet, uiState.walletIssuerId, uiState.walletClassSuffix, uiState.walletBackendUrl, t, onPickPhoto, onPickQrCode, viewModel::updateDraft, viewModel::updateWalletSettings, viewModel::saveDraft, viewModel::persistWalletSettings, viewModel::clearDraft, viewModel::clearDraftQr)
+                AppTab.CREATE -> CreateScreen(
+                    padding = padding,
+                    draft = uiState.draft,
+                    canUseGoogleWallet = uiState.canUseGoogleWallet,
+                    walletIssuerId = uiState.walletIssuerId,
+                    walletClassSuffix = uiState.walletClassSuffix,
+                    walletBackendUrl = uiState.walletBackendUrl,
+                    t = t,
+                    onPickPhoto = onPickPhoto,
+                    onPickQrCode = onPickQrCode,
+                    onScanQrFromBitmap = viewModel::scanQrFromBitmap,
+                    onImportVCard = viewModel::importVCardFromUri,
+                    onDraftChange = viewModel::updateDraft,
+                    onWalletSettingsChange = viewModel::updateWalletSettings,
+                    onCreatePass = viewModel::saveDraft,
+                    onPersistWalletSettings = viewModel::persistWalletSettings,
+                    onClearDraft = viewModel::clearDraft,
+                    onClearQr = viewModel::clearDraftQr
+                )
                 AppTab.SAVED -> CardsScreen(padding, t("saved_head"), t("saved_sub"), "${uiState.cards.size} ${t("saved_count")}", uiState.cards, t, true, onSaveToWallet, { viewModel.deleteCard(it.id) }) {
                     viewModel.editCard(it); tab = AppTab.CREATE
                 }
-                AppTab.SETTINGS -> SettingsScreen(padding, uiState.appLanguage, uiState.canUseGoogleWallet, uiState.walletIssuerId, uiState.walletClassSuffix, uiState.walletBackendUrl, t, viewModel::updateLanguage, viewModel::updateWalletSettings, viewModel::persistWalletSettings)
+                AppTab.SETTINGS -> SettingsScreen(
+                    padding = padding,
+                    cards = uiState.cards,
+                    currentLanguage = uiState.appLanguage,
+                    canUseGoogleWallet = uiState.canUseGoogleWallet,
+                    walletIssuerId = uiState.walletIssuerId,
+                    walletClassSuffix = uiState.walletClassSuffix,
+                    walletBackendUrl = uiState.walletBackendUrl,
+                    t = t,
+                    onLanguageSelected = viewModel::updateLanguage,
+                    onWalletSettingsChange = viewModel::updateWalletSettings,
+                    onPersistWalletSettings = viewModel::persistWalletSettings,
+                    onImportBackup = viewModel::importBackupFromUri
+                )
             }
         }
     }
@@ -177,6 +221,8 @@ private fun CreateScreen(
     t: (String) -> String,
     onPickPhoto: () -> Unit,
     onPickQrCode: () -> Unit,
+    onScanQrFromBitmap: (Bitmap) -> Unit,
+    onImportVCard: (Uri) -> Unit,
     onDraftChange: ((CardDraft) -> CardDraft) -> Unit,
     onWalletSettingsChange: (String?, String?, String?) -> Unit,
     onCreatePass: () -> Unit,
@@ -195,6 +241,8 @@ private fun CreateScreen(
                 t = t,
                 onPickPhoto = onPickPhoto,
                 onPickQrCode = onPickQrCode,
+                onScanQrFromBitmap = onScanQrFromBitmap,
+                onImportVCard = onImportVCard,
                 onDraftChange = onDraftChange,
                 onWalletSettingsChange = onWalletSettingsChange,
                 onCreatePass = onCreatePass,
@@ -216,6 +264,8 @@ private fun CreateInvitesEditorCard(
     t: (String) -> String,
     onPickPhoto: () -> Unit,
     onPickQrCode: () -> Unit,
+    onScanQrFromBitmap: (Bitmap) -> Unit,
+    onImportVCard: (Uri) -> Unit,
     onDraftChange: ((CardDraft) -> CardDraft) -> Unit,
     onWalletSettingsChange: (String?, String?, String?) -> Unit,
     onCreatePass: () -> Unit,
@@ -225,6 +275,16 @@ private fun CreateInvitesEditorCard(
 ) {
     val accentColor = parseColor(draft.passColor)
     var preview by rememberSaveable { mutableStateOf(false) }
+
+    val qrCamera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
+        bitmap ?: return@rememberLauncherForActivityResult
+        onScanQrFromBitmap(bitmap)
+    }
+
+    val vcfPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        onImportVCard(uri)
+    }
 
     ElevatedCard(
         modifier = Modifier.fillMaxWidth().animateContentSize(),
@@ -325,13 +385,20 @@ private fun CreateInvitesEditorCard(
                     Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(t("qr_code"), color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                         if (draft.qrValue.isBlank()) {
-                            FilledTonalButton(onClick = onPickQrCode) { Text(t("qr_pick")) }
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                FilledTonalButton(onClick = onPickQrCode, modifier = Modifier.weight(1f)) { Text(t("qr_pick")) }
+                                FilledTonalButton(onClick = { qrCamera.launch() }, modifier = Modifier.weight(1f)) { Text(t("qr_scan")) }
+                            }
                         } else {
                             QrCodeCard(value = draft.qrValue, label = t("qr_code"), showValueText = false)
                             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                FilledTonalButton(onClick = onPickQrCode) { Text(t("qr_change")) }
+                                FilledTonalButton(onClick = onPickQrCode, modifier = Modifier.weight(1f)) { Text(t("qr_change")) }
+                                FilledTonalButton(onClick = { qrCamera.launch() }, modifier = Modifier.weight(1f)) { Text(t("qr_scan")) }
                                 TextButton(onClick = onClearQr) { Text(t("qr_remove"), color = Color.White) }
                             }
+                        }
+                        TextButton(onClick = { vcfPicker.launch(arrayOf("text/vcard", "text/x-vcard", "text/plain", "*/*")) }) {
+                            Text(t("vcf_import"), color = Color.White)
                         }
                     }
                 }
@@ -433,8 +500,26 @@ private fun EditorCard(
 }
 
 @Composable
-private fun SettingsScreen(padding: PaddingValues, currentLanguage: AppLanguage, canUseGoogleWallet: Boolean, walletIssuerId: String, walletClassSuffix: String, walletBackendUrl: String, t: (String) -> String, onLanguageSelected: (AppLanguage) -> Unit, onWalletSettingsChange: (String?, String?, String?) -> Unit, onPersistWalletSettings: () -> Unit) {
+private fun SettingsScreen(
+    padding: PaddingValues,
+    cards: List<VisitingCard>,
+    currentLanguage: AppLanguage,
+    canUseGoogleWallet: Boolean,
+    walletIssuerId: String,
+    walletClassSuffix: String,
+    walletBackendUrl: String,
+    t: (String) -> String,
+    onLanguageSelected: (AppLanguage) -> Unit,
+    onWalletSettingsChange: (String?, String?, String?) -> Unit,
+    onPersistWalletSettings: () -> Unit,
+    onImportBackup: (Uri) -> Unit
+) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val backupPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        onImportBackup(uri)
+    }
     LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 120.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
         item { Hero(t("settings_head"), t("settings_sub"), "${t("version")}: ${BuildConfig.VERSION_NAME}") }
         item {
@@ -459,6 +544,37 @@ private fun SettingsScreen(padding: PaddingValues, currentLanguage: AppLanguage,
             }
         }
         item { WalletCard(canUseGoogleWallet, walletIssuerId, walletClassSuffix, walletBackendUrl, t, onWalletSettingsChange, onPersistWalletSettings) }
+        item {
+            ElevatedCard(shape = RoundedCornerShape(28.dp)) {
+                Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(t("backup"), style = MaterialTheme.typography.titleLarge)
+                    Text("${cards.size} ${t("saved_count")}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        FilledTonalButton(
+                            onClick = {
+                                scope.launch {
+                                    runCatching {
+                                        val uri = withContext(Dispatchers.IO) { CardsBackup.exportJson(context, cards) }
+                                        shareFile(context, uri, "application/json", t("backup"))
+                                    }.onFailure { error ->
+                                        showToast(context, error.message ?: "Falha ao exportar backup.")
+                                    }
+                                }
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(t("backup_export"))
+                        }
+                        FilledTonalButton(
+                            onClick = { backupPicker.launch(arrayOf("application/json", "text/plain", "*/*")) },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(t("backup_import"))
+                        }
+                    }
+                }
+            }
+        }
         item {
             ElevatedCard(shape = RoundedCornerShape(28.dp)) {
                 Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -528,6 +644,9 @@ private fun DraftPreview(draft: CardDraft, passLabel: String, t: (String) -> Str
 @Composable
 private fun SavedPassCard(card: VisitingCard, t: (String) -> String, showDelete: Boolean, onEdit: () -> Unit, onDelete: () -> Unit, onSaveToWallet: () -> Unit) {
     val accentColor = parseColor(card.passColor)
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var shareMenuExpanded by remember(card.id) { mutableStateOf(false) }
     val phone = card.phone.ifBlank { "Sem telefone" }
     val email = card.email.ifBlank { "Sem email" }
     val allLines = listOf(
@@ -682,8 +801,85 @@ private fun SavedPassCard(card: VisitingCard, t: (String) -> String, showDelete:
                     ) {
                         FilledTonalButton(onClick = onEdit) {
                             Icon(Icons.Rounded.Edit, null)
-                            Spacer(Modifier.width(8.dp))
-                            Text(t(if (showDelete) "edit" else "open_create"))
+                            if (showDelete) {
+                                Spacer(Modifier.width(8.dp))
+                                Text(t("edit"))
+                            }
+                        }
+                        Box {
+                            FilledTonalButton(onClick = { shareMenuExpanded = true }) {
+                                Icon(Icons.Rounded.Share, null)
+                            }
+                            DropdownMenu(expanded = shareMenuExpanded, onDismissRequest = { shareMenuExpanded = false }) {
+                                DropdownMenuItem(
+                                    text = { Text(t("share_image")) },
+                                    onClick = {
+                                        shareMenuExpanded = false
+                                        scope.launch {
+                                            runCatching {
+                                                val uri = withContext(Dispatchers.IO) { CardExport.exportPng(context, card) }
+                                                shareFile(context, uri, "image/png", t("share"))
+                                            }.onFailure { error ->
+                                                showToast(context, error.message ?: "Falha ao exportar imagem.")
+                                            }
+                                        }
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(t("share_pdf")) },
+                                    onClick = {
+                                        shareMenuExpanded = false
+                                        scope.launch {
+                                            runCatching {
+                                                val uri = withContext(Dispatchers.IO) { CardExport.exportPdf(context, card) }
+                                                shareFile(context, uri, "application/pdf", t("share"))
+                                            }.onFailure { error ->
+                                                showToast(context, error.message ?: "Falha ao exportar PDF.")
+                                            }
+                                        }
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(t("share_vcard")) },
+                                    onClick = {
+                                        shareMenuExpanded = false
+                                        scope.launch {
+                                            runCatching {
+                                                val uri = withContext(Dispatchers.IO) { CardExport.exportVcf(context, card) }
+                                                shareFile(context, uri, "text/x-vcard", t("share"))
+                                            }.onFailure { error ->
+                                                showToast(context, error.message ?: "Falha ao exportar vCard.")
+                                            }
+                                        }
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(t("share_contacts")) },
+                                    onClick = {
+                                        shareMenuExpanded = false
+                                        runCatching {
+                                            val notes = buildList {
+                                                card.note.trim().takeIf { it.isNotBlank() }?.let { add(it) }
+                                                card.instagram.trim().takeIf { it.isNotBlank() }?.let { add("Instagram: $it") }
+                                                card.linkedin.trim().takeIf { it.isNotBlank() }?.let { add("LinkedIn: $it") }
+                                                card.website.trim().takeIf { it.isNotBlank() }?.let { add("Website: $it") }
+                                            }.joinToString("\n")
+
+                                            val intent = Intent(ContactsContract.Intents.Insert.ACTION).apply {
+                                                type = ContactsContract.RawContacts.CONTENT_TYPE
+                                                putExtra(ContactsContract.Intents.Insert.NAME, card.name.trim())
+                                                putExtra(ContactsContract.Intents.Insert.JOB_TITLE, card.role.trim())
+                                                putExtra(ContactsContract.Intents.Insert.PHONE, card.phone.trim())
+                                                putExtra(ContactsContract.Intents.Insert.EMAIL, card.email.trim())
+                                                putExtra(ContactsContract.Intents.Insert.NOTES, notes)
+                                            }
+                                            context.startActivity(intent)
+                                        }.onFailure { error ->
+                                            showToast(context, error.message ?: "Falha ao abrir Contatos.")
+                                        }
+                                    }
+                                )
+                            }
                         }
                         WalletActionButton(onClick = onSaveToWallet, label = t("wallet_add"), modifier = Modifier.weight(1f))
                         if (showDelete) TextButton(onClick = onDelete) {
@@ -959,11 +1155,28 @@ private fun generateQrBitmap(value: String): Bitmap? = runCatching {
     }
 }.getOrNull()
 
+private fun shareFile(context: android.content.Context, uri: Uri, mime: String, chooserTitle: String) {
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = mime
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+
+    val chooser = Intent.createChooser(intent, chooserTitle).apply {
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    context.startActivity(chooser)
+}
+
+private fun showToast(context: android.content.Context, message: String) {
+    Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+}
+
 private fun tr(language: AppLanguage, key: String): String {
     val pt = mapOf("home" to "Home", "create" to "Criar", "saved" to "Salvos", "settings" to "Config.", "home_head" to "Recentes", "home_sub" to "", "home_empty_title" to "Sem cartões recentes", "home_empty_body" to "Crie um passe para vê-lo aqui.", "create_head" to "Criar cartão", "create_sub" to "Abra o campo criar e monte o passe.", "create_hint" to "Personalize apenas a cor do passe.", "saved_head" to "Todos os cartões salvos", "saved_sub" to "Aqui ficam todos os cartões guardados.", "saved_count" to "cartões salvos", "saved_empty_title" to "Sem cartões salvos", "saved_empty_body" to "Os cartões criados aparecem aqui.", "settings_head" to "Configurações", "settings_sub" to "Versão, GitHub, idioma e Google Wallet.", "version" to "Versão", "github" to "Minha conta do GitHub", "language" to "Idioma do app", "open_create" to "Abrir criar", "edit" to "Editar", "delete" to "Excluir", "pass" to "Passe", "add_photo" to "Adicionar foto", "change_photo" to "Trocar foto", "photo_hint" to "A foto fica salva no app. Para aparecer no Google Wallet, use uma URL pública.", "name" to "Nome", "role" to "Cargo", "phone" to "Celular", "email" to "Email", "instagram" to "Instagram", "linkedin" to "LinkedIn", "url" to "URL", "note" to "Nota", "qr_code" to "QR code", "wallet_photo" to "URL pública da foto para o Wallet", "pass_color" to "Cor do passe", "create_pass" to "Criar passe", "clear" to "Limpar", "wallet" to "Google Wallet", "wallet_on" to "Google Wallet disponível neste aparelho.", "wallet_off" to "Google Wallet indisponível ou não elegível neste aparelho.", "backend" to "URL do backend JWT", "wallet_save" to "Salvar configuração do Wallet", "wallet_add" to "Salvar no Wallet")
-    val pt2 = pt + mapOf("qr_pick" to "Selecionar imagem de QR Code", "qr_change" to "Trocar QR", "qr_remove" to "Remover QR", "premium_ui_open" to "Abrir UI Premium", "premium_ui_hint" to "Nova interface com estilo premium (Apple + Material You).")
+    val pt2 = pt + mapOf("qr_pick" to "Selecionar imagem de QR Code", "qr_change" to "Trocar QR", "qr_remove" to "Remover QR", "qr_scan" to "Escanear QR", "vcf_import" to "Importar vCard (.vcf)", "backup" to "Backup", "backup_export" to "Exportar", "backup_import" to "Importar", "share" to "Compartilhar", "share_image" to "Imagem (PNG)", "share_pdf" to "PDF", "share_vcard" to "vCard (.vcf)", "share_contacts" to "Salvar nos contatos", "premium_ui_open" to "Abrir UI Premium", "premium_ui_hint" to "Nova interface com estilo premium (Apple + Material You).")
     val en = mapOf("home" to "Home", "create" to "Create", "saved" to "Saved", "settings" to "Settings", "home_head" to "Recents", "home_sub" to "", "home_empty_title" to "No recent cards", "home_empty_body" to "Create a pass to see it here.", "create_head" to "Create card", "create_sub" to "Open the create area and build the pass.", "create_hint" to "Only customize the pass color.", "saved_head" to "All saved cards", "saved_sub" to "Every saved card appears here.", "saved_count" to "saved cards", "saved_empty_title" to "No saved cards", "saved_empty_body" to "Created cards appear here.", "settings_head" to "Settings", "settings_sub" to "Version, GitHub, language and Google Wallet.", "version" to "Version", "github" to "My GitHub account", "language" to "App language", "open_create" to "Open create", "edit" to "Edit", "delete" to "Delete", "pass" to "Pass", "add_photo" to "Add photo", "change_photo" to "Change photo", "photo_hint" to "The photo is saved in the app. To show in Google Wallet, use a public image URL.", "name" to "Name", "role" to "Role", "phone" to "Phone", "email" to "Email", "instagram" to "Instagram", "linkedin" to "LinkedIn", "url" to "URL", "note" to "Note", "qr_code" to "QR code", "wallet_photo" to "Public photo URL for Wallet", "pass_color" to "Pass color", "create_pass" to "Create pass", "clear" to "Clear", "wallet" to "Google Wallet", "wallet_on" to "Google Wallet is available on this device.", "wallet_off" to "Google Wallet is unavailable or not eligible on this device.", "backend" to "JWT backend URL", "wallet_save" to "Save Wallet settings", "wallet_add" to "Save to Wallet", "qr_pick" to "Select QR Code image", "qr_change" to "Change QR", "qr_remove" to "Remove QR")
-    val en2 = en + mapOf("premium_ui_open" to "Open Premium UI", "premium_ui_hint" to "New premium interface (Apple + Material You).")
-    val zh = mapOf("home" to "首页", "create" to "创建", "saved" to "已保存", "settings" to "设置", "home_head" to "最近", "home_sub" to "", "home_empty_title" to "没有最近卡片", "home_empty_body" to "创建通行证后会显示在这里。", "create_head" to "创建卡片", "create_sub" to "打开创建区域并制作通行证。", "create_hint" to "只允许自定义通行证颜色。", "saved_head" to "所有已保存卡片", "saved_sub" to "所有保存的卡片都在这里。", "saved_count" to "张已保存卡片", "saved_empty_title" to "没有已保存卡片", "saved_empty_body" to "已创建的卡片会显示在这里。", "settings_head" to "设置", "settings_sub" to "版本、GitHub、语言和 Google Wallet。", "version" to "版本", "github" to "我的 GitHub 账号", "language" to "应用语言", "open_create" to "打开创建", "edit" to "编辑", "delete" to "删除", "pass" to "通行证", "add_photo" to "添加照片", "change_photo" to "更换照片", "photo_hint" to "照片会保存在应用中。若要显示在 Google Wallet 中，请使用公开图片链接。", "name" to "姓名", "role" to "职位", "phone" to "手机", "email" to "邮箱", "instagram" to "Instagram", "linkedin" to "LinkedIn", "url" to "链接", "note" to "备注", "qr_code" to "二维码", "wallet_photo" to "Wallet 公开照片链接", "pass_color" to "通行证颜色", "create_pass" to "创建通行证", "clear" to "清空", "wallet" to "Google Wallet", "wallet_on" to "此设备支持 Google Wallet。", "wallet_off" to "此设备不支持 Google Wallet。", "backend" to "JWT 后端地址", "wallet_save" to "保存 Wallet 设置", "wallet_add" to "保存到 Wallet", "qr_pick" to "选择二维码图片", "qr_change" to "更换二维码", "qr_remove" to "移除二维码", "premium_ui_open" to "打开高级界面", "premium_ui_hint" to "新界面（Apple + Material You）。")
+    val en2 = en + mapOf("qr_scan" to "Scan QR", "vcf_import" to "Import vCard (.vcf)", "backup" to "Backup", "backup_export" to "Export", "backup_import" to "Import", "share" to "Share", "share_image" to "Image (PNG)", "share_pdf" to "PDF", "share_vcard" to "vCard (.vcf)", "share_contacts" to "Save to contacts", "premium_ui_open" to "Open Premium UI", "premium_ui_hint" to "New premium interface (Apple + Material You).")
+    val zh = mapOf("home" to "首页", "create" to "创建", "saved" to "已保存", "settings" to "设置", "home_head" to "最近", "home_sub" to "", "home_empty_title" to "没有最近卡片", "home_empty_body" to "创建通行证后会显示在这里。", "create_head" to "创建卡片", "create_sub" to "打开创建区域并制作通行证。", "create_hint" to "只允许自定义通行证颜色。", "saved_head" to "所有已保存卡片", "saved_sub" to "所有保存的卡片都在这里。", "saved_count" to "张已保存卡片", "saved_empty_title" to "没有已保存卡片", "saved_empty_body" to "已创建的卡片会显示在这里。", "settings_head" to "设置", "settings_sub" to "版本、GitHub、语言和 Google Wallet。", "version" to "版本", "github" to "我的 GitHub 账号", "language" to "应用语言", "open_create" to "打开创建", "edit" to "编辑", "delete" to "删除", "pass" to "通行证", "add_photo" to "添加照片", "change_photo" to "更换照片", "photo_hint" to "照片会保存在应用中。若要显示在 Google Wallet 中，请使用公开图片链接。", "name" to "姓名", "role" to "职位", "phone" to "手机", "email" to "邮箱", "instagram" to "Instagram", "linkedin" to "LinkedIn", "url" to "链接", "note" to "备注", "qr_code" to "二维码", "wallet_photo" to "Wallet 公开照片链接", "pass_color" to "通行证颜色", "create_pass" to "创建通行证", "clear" to "清空", "wallet" to "Google Wallet", "wallet_on" to "此设备支持 Google Wallet。", "wallet_off" to "此设备不支持 Google Wallet。", "backend" to "JWT 后端地址", "wallet_save" to "保存 Wallet 设置", "wallet_add" to "保存到 Wallet", "qr_pick" to "选择二维码图片", "qr_change" to "更换二维码", "qr_remove" to "移除二维码", "qr_scan" to "扫描二维码", "vcf_import" to "导入 vCard (.vcf)", "backup" to "备份", "backup_export" to "导出", "backup_import" to "导入", "share" to "分享", "share_image" to "图片 (PNG)", "share_pdf" to "PDF", "share_vcard" to "vCard (.vcf)", "share_contacts" to "保存到联系人", "premium_ui_open" to "打开高级界面", "premium_ui_hint" to "新界面（Apple + Material You）。")
     return when (language) { AppLanguage.EN -> en2[key] ?: key; AppLanguage.ZH -> zh[key] ?: key; else -> pt2[key] ?: key }
 }

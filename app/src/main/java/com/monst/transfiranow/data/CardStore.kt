@@ -72,6 +72,24 @@ class CardStore(private val context: Context) {
         }
     }
 
+    suspend fun replaceCards(cards: List<VisitingCard>) {
+        persistCards(cards.sortedByDescending { it.updatedAt })
+    }
+
+    suspend fun mergeCards(cards: List<VisitingCard>) {
+        val existing = loadCardsMutable()
+        val byId = existing.associateBy { it.id }.toMutableMap()
+
+        for (incoming in cards) {
+            val current = byId[incoming.id]
+            if (current == null || incoming.updatedAt >= current.updatedAt) {
+                byId[incoming.id] = incoming
+            }
+        }
+
+        persistCards(byId.values.sortedByDescending { it.updatedAt })
+    }
+
     private suspend fun loadCardsMutable(): MutableList<VisitingCard> {
         return context.dataStore.data
             .map { parseCards(it[cardsKey].orEmpty()) }
