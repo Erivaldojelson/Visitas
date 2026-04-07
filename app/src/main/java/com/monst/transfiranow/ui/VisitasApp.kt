@@ -16,12 +16,16 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.expandVertically
@@ -49,9 +53,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.AddPhotoAlternate
-import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Home
@@ -119,6 +123,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.floor
+import kotlin.math.sin
+import kotlin.random.Random
 
 private enum class AppTab { HOME, CREATE, SAVED, SETTINGS }
 private enum class OverlayScreen { MAIN, DETAILS_SAVED, DETAILS_DRAFT }
@@ -149,9 +158,45 @@ fun VisitasApp(
             AnimatedContent(
                 targetState = overlayScreen,
                 transitionSpec = {
-                    (fadeIn(tween(180)) + expandVertically(tween(240))).togetherWith(
-                        fadeOut(tween(120)) + shrinkVertically(tween(220))
-                    ).using(SizeTransform(clip = false))
+                    val forward = initialState == OverlayScreen.MAIN && targetState != OverlayScreen.MAIN
+
+                    val enterSpring = spring<Float>(
+                        dampingRatio = Spring.DampingRatioLowBouncy,
+                        stiffness = Spring.StiffnessLow
+                    )
+                    val exitSpring = spring<Float>(
+                        dampingRatio = Spring.DampingRatioNoBouncy,
+                        stiffness = Spring.StiffnessMediumLow
+                    )
+
+                    val enter = if (forward) {
+                        slideInHorizontally(
+                            animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow)
+                        ) { fullWidth -> (fullWidth * 0.92f).toInt() } +
+                            fadeIn(tween(180)) +
+                            scaleIn(animationSpec = enterSpring, initialScale = 0.985f)
+                    } else {
+                        slideInHorizontally(
+                            animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
+                        ) { fullWidth -> (-fullWidth * 0.18f).toInt() } +
+                            fadeIn(tween(160))
+                    }
+
+                    val exit = if (forward) {
+                        slideOutHorizontally(
+                            animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
+                        ) { fullWidth -> (-fullWidth * 0.18f).toInt() } +
+                            fadeOut(tween(140)) +
+                            scaleOut(animationSpec = exitSpring, targetScale = 0.99f)
+                    } else {
+                        slideOutHorizontally(
+                            animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow)
+                        ) { fullWidth -> (fullWidth * 0.92f).toInt() } +
+                            fadeOut(tween(140)) +
+                            scaleOut(animationSpec = exitSpring, targetScale = 0.985f)
+                    }
+
+                    enter.togetherWith(exit).using(SizeTransform(clip = false))
                 },
                 label = "overlay-screen"
             ) { screen ->
@@ -1009,7 +1054,7 @@ private fun PassDetailsScreen(
     LaunchedEffect(Unit) { visible = true }
 
     Box(Modifier.fillMaxSize()) {
-        AnimatedColorfulGradient(
+        AnimatedGraySparkleBackground(
             modifier = Modifier.matchParentSize(),
             seed = accentColor,
             alpha = 1f
@@ -1037,7 +1082,7 @@ private fun PassDetailsScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     TextButton(onClick = onBack) {
-                        Icon(Icons.Rounded.ArrowBack, contentDescription = null, tint = Color.White)
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null, tint = Color.White)
                         Spacer(Modifier.width(6.dp))
                         Text("Voltar", color = Color.White, fontWeight = FontWeight.SemiBold)
                     }
@@ -1060,8 +1105,14 @@ private fun PassDetailsScreen(
                 item {
                     AnimatedVisibility(
                         visible = visible,
-                        enter = fadeIn(tween(220)) + scaleIn(tween(260), initialScale = 0.96f),
-                        exit = fadeOut(tween(160)) + scaleOut(tween(200), targetScale = 0.98f)
+                        enter = fadeIn(tween(180)) + scaleIn(
+                            animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow),
+                            initialScale = 0.92f
+                        ),
+                        exit = fadeOut(tween(140)) + scaleOut(
+                            animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
+                            targetScale = 0.985f
+                        )
                     ) {
                         PassExpandedCard(
                             accentColor = accentColor,
@@ -1123,36 +1174,105 @@ private fun PassExpandedCard(
     }
 }
 
+private data class SparkleDot(
+    val baseX: Float,
+    val baseY: Float,
+    val radiusDp: Float,
+    val drift: Float,
+    val speed: Float,
+    val phase: Float,
+    val intensity: Float
+)
+
 @Composable
-private fun AnimatedColorfulGradient(modifier: Modifier = Modifier, seed: Color, alpha: Float = 1f) {
-    val transition = rememberInfiniteTransition(label = "colorful-gradient")
-    val shiftX by transition.animateFloat(
+private fun AnimatedGraySparkleBackground(modifier: Modifier = Modifier, seed: Color, alpha: Float = 1f) {
+    val transition = rememberInfiniteTransition(label = "sparkle-bg")
+    val time01 by transition.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(2400, easing = LinearEasing), repeatMode = RepeatMode.Reverse),
-        label = "shift-x"
+        animationSpec = infiniteRepeatable(tween(9000, easing = LinearEasing), repeatMode = RepeatMode.Restart),
+        label = "time-01"
     )
-    val shiftY by transition.animateFloat(
+    val twinkle01 by transition.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(3200, easing = LinearEasing), repeatMode = RepeatMode.Reverse),
-        label = "shift-y"
+        animationSpec = infiniteRepeatable(tween(4600, easing = LinearEasing), repeatMode = RepeatMode.Restart),
+        label = "twinkle-01"
     )
 
-    val palette = listOf(
-        seed,
-        Color(0xFFFF6FD8),
-        Color(0xFF00C2FF),
-        Color(0xFFFFD54F),
-        seed
-    )
+    val seedInt = remember(seed) { seed.toArgb() }
+    val dots = remember(seedInt) {
+        val rnd = Random(seedInt)
+        List(26) {
+            SparkleDot(
+                baseX = rnd.nextFloat(),
+                baseY = rnd.nextFloat(),
+                radiusDp = 1.1f + rnd.nextFloat() * 2.0f,
+                drift = 0.035f + rnd.nextFloat() * 0.07f,
+                speed = 0.18f + rnd.nextFloat() * 0.55f,
+                phase = rnd.nextFloat(),
+                intensity = 0.35f + rnd.nextFloat() * 0.75f
+            )
+        }
+    }
 
     Box(
         modifier = modifier.drawWithCache {
-            val start = Offset(size.width * shiftX, size.height * (0.15f + 0.85f * shiftY))
-            val end = Offset(size.width * (1f - shiftY), size.height * (0.85f - 0.70f * shiftX))
-            val brush = Brush.linearGradient(colors = palette, start = start, end = end)
-            onDrawBehind { drawRect(brush = brush, alpha = alpha) }
+            val tau = (2f * PI).toFloat()
+
+            val gX = 0.5f + 0.5f * sin(tau * time01)
+            val gY = 0.5f + 0.5f * cos(tau * (time01 * 0.82f) + 0.6f)
+
+            val start = Offset(size.width * (0.10f + 0.80f * gX), size.height * (0.10f + 0.80f * gY))
+            val end = Offset(size.width * (0.90f - 0.80f * gY), size.height * (0.90f - 0.80f * gX))
+
+            val base = Brush.linearGradient(
+                colors = listOf(
+                    Color(0xFF0B0C0F),
+                    Color(0xFF171A21),
+                    Color(0xFF2A2E37),
+                    Color(0xFF101216)
+                ),
+                start = start,
+                end = end
+            )
+
+            onDrawBehind {
+                drawRect(brush = base, alpha = alpha)
+
+                val minDim = size.minDimension
+                listOf(0.15f, 0.48f, 0.79f).forEachIndexed { i, phase ->
+                    val bx = 0.5f + 0.45f * sin(tau * (time01 * (0.56f + i * 0.07f) + phase))
+                    val by = 0.5f + 0.45f * cos(tau * (time01 * (0.49f + i * 0.06f) + phase * 1.13f))
+                    val center = Offset(size.width * bx, size.height * by)
+                    val radius = minDim * (0.55f + 0.08f * sin(tau * (time01 + phase)))
+                    val blob = Brush.radialGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.10f),
+                            Color.Transparent
+                        ),
+                        center = center,
+                        radius = radius
+                    )
+                    drawCircle(brush = blob, radius = radius, center = center, alpha = alpha * 0.85f)
+                }
+
+                dots.forEach { dot ->
+                    val angle = tau * (time01 * dot.speed + dot.phase)
+                    val xN = wrap01(dot.baseX + dot.drift * sin(angle))
+                    val yN = wrap01(dot.baseY + dot.drift * cos(angle * 0.93f))
+
+                    val twinkle = 0.35f + 0.65f * (0.5f + 0.5f * sin(tau * (twinkle01 * (0.6f + dot.speed) + dot.phase)))
+                    val a = alpha * dot.intensity * twinkle
+
+                    val center = Offset(size.width * xN, size.height * yN)
+                    val r = dot.radiusDp.dp.toPx()
+
+                    drawCircle(color = Color.White.copy(alpha = a * 0.06f), radius = r * 12f, center = center)
+                    drawCircle(color = Color.White.copy(alpha = a * 0.16f), radius = r * 5f, center = center)
+                    drawCircle(color = Color.White.copy(alpha = a), radius = r, center = center)
+                }
+            }
         }
     )
 }
@@ -1161,12 +1281,18 @@ private fun AnimatedColorfulGradient(modifier: Modifier = Modifier, seed: Color,
 private fun ColorfulLoadingOverlay(visible: Boolean, message: String, accentColor: Color) {
     AnimatedVisibility(
         visible = visible,
-        enter = fadeIn(tween(120)) + scaleIn(tween(220), initialScale = 0.96f),
-        exit = fadeOut(tween(200)) + scaleOut(tween(160), targetScale = 0.98f)
+        enter = fadeIn(tween(140)) + scaleIn(
+            animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow),
+            initialScale = 0.94f
+        ),
+        exit = fadeOut(tween(160)) + scaleOut(
+            animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
+            targetScale = 0.985f
+        )
     ) {
         Box(Modifier.fillMaxSize()) {
-            AnimatedColorfulGradient(Modifier.matchParentSize(), seed = accentColor, alpha = 1f)
-            Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.45f)))
+            AnimatedGraySparkleBackground(Modifier.matchParentSize(), seed = accentColor, alpha = 1f)
+            Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.55f)))
             Surface(
                 modifier = Modifier.align(Alignment.Center),
                 shape = RoundedCornerShape(28.dp),
@@ -1183,6 +1309,11 @@ private fun ColorfulLoadingOverlay(visible: Boolean, message: String, accentColo
             }
         }
     }
+}
+
+private fun wrap01(value: Float): Float {
+    val wrapped = value - floor(value)
+    return if (wrapped < 0f) wrapped + 1f else wrapped
 }
 
 @Composable
