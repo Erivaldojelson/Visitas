@@ -8,12 +8,20 @@ import android.widget.ImageView
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.expandVertically
@@ -43,6 +51,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.AddPhotoAlternate
+import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Home
@@ -67,6 +76,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -78,11 +88,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -104,10 +116,12 @@ import com.monst.transfiranow.share.CardExport
 import com.monst.transfiranow.share.CardsBackup
 import com.monst.transfiranow.ui.theme.TransfiraNowTheme
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private enum class AppTab { HOME, CREATE, SAVED, SETTINGS }
+private enum class OverlayScreen { MAIN, DETAILS_SAVED, DETAILS_DRAFT }
 
 @Composable
 fun VisitasApp(
@@ -118,53 +132,168 @@ fun VisitasApp(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var tab by remember { mutableStateOf(AppTab.HOME) }
+    val scope = rememberCoroutineScope()
+    var detailsCardId by rememberSaveable { mutableStateOf<String?>(null) }
+    var showDraftDetails by rememberSaveable { mutableStateOf(false) }
+    var showColorfulOverlay by rememberSaveable { mutableStateOf(false) }
     val t: (String) -> String = { key -> tr(uiState.appLanguage, key) }
-    TransfiraNowTheme(dynamicColor = true, accentColor = parseColor(uiState.draft.passColor)) {
-        Scaffold(
-            containerColor = MaterialTheme.colorScheme.background,
-            bottomBar = { PillBar(tab, t) { tab = it } }
-        ) { padding ->
-            when (tab) {
-                AppTab.HOME -> CardsScreen(padding, t("home_head"), "", "", uiState.cards.take(10), t, false, onSaveToWallet, {}) {
-                    viewModel.editCard(it); tab = AppTab.CREATE
+    val detailsCard = uiState.cards.firstOrNull { it.id == detailsCardId }
+    val overlayScreen = when {
+        showDraftDetails -> OverlayScreen.DETAILS_DRAFT
+        detailsCard != null -> OverlayScreen.DETAILS_SAVED
+        else -> OverlayScreen.MAIN
+    }
+    val themeAccent = parseColor(detailsCard?.passColor ?: uiState.draft.passColor)
+    TransfiraNowTheme(dynamicColor = true, accentColor = themeAccent) {
+        Box(Modifier.fillMaxSize()) {
+            AnimatedContent(
+                targetState = overlayScreen,
+                transitionSpec = {
+                    (fadeIn(tween(180)) + expandVertically(tween(240))).togetherWith(
+                        fadeOut(tween(120)) + shrinkVertically(tween(220))
+                    ).using(SizeTransform(clip = false))
+                },
+                label = "overlay-screen"
+            ) { screen ->
+                when (screen) {
+                    OverlayScreen.MAIN -> {
+                        Scaffold(
+                            containerColor = MaterialTheme.colorScheme.background,
+                            bottomBar = { PillBar(tab, t) { tab = it } }
+                        ) { padding ->
+                            when (tab) {
+                                AppTab.HOME -> CardsScreen(
+                                    padding = padding,
+                                    title = t("home_head"),
+                                    subtitle = "",
+                                    message = "",
+                                    cards = uiState.cards.take(10),
+                                    t = t,
+                                    showDelete = false,
+                                    onSaveToWallet = onSaveToWallet,
+                                    onDelete = {},
+                                    onEdit = {
+                                        viewModel.editCard(it)
+                                        tab = AppTab.CREATE
+                                    },
+                                    onOpenDetails = { detailsCardId = it.id }
+                                )
+                                AppTab.CREATE -> CreateScreen(
+                                    padding = padding,
+                                    draft = uiState.draft,
+                                    canUseGoogleWallet = uiState.canUseGoogleWallet,
+                                    walletIssuerId = uiState.walletIssuerId,
+                                    walletClassSuffix = uiState.walletClassSuffix,
+                                    walletBackendUrl = uiState.walletBackendUrl,
+                                    t = t,
+                                    onPickPhoto = onPickPhoto,
+                                    onPickQrCode = onPickQrCode,
+                                    onScanQrFromBitmap = viewModel::scanQrFromBitmap,
+                                    onImportVCard = viewModel::importVCardFromUri,
+                                    onDraftChange = viewModel::updateDraft,
+                                    onWalletSettingsChange = viewModel::updateWalletSettings,
+                                    onCreatePass = {
+                                        if (uiState.draft.name.isBlank()) {
+                                            viewModel.saveDraft()
+                                        } else {
+                                            scope.launch {
+                                                showColorfulOverlay = true
+                                                viewModel.saveDraft()
+                                                delay(1100)
+                                                showColorfulOverlay = false
+                                            }
+                                        }
+                                    },
+                                    onPersistWalletSettings = viewModel::persistWalletSettings,
+                                    onClearDraft = viewModel::clearDraft,
+                                    onClearQr = viewModel::clearDraftQr,
+                                    onOpenDraftDetails = { showDraftDetails = true }
+                                )
+                                AppTab.SAVED -> CardsScreen(
+                                    padding = padding,
+                                    title = t("saved_head"),
+                                    subtitle = t("saved_sub"),
+                                    message = "${uiState.cards.size} ${t("saved_count")}",
+                                    cards = uiState.cards,
+                                    t = t,
+                                    showDelete = true,
+                                    onSaveToWallet = onSaveToWallet,
+                                    onDelete = { viewModel.deleteCard(it.id) },
+                                    onEdit = {
+                                        viewModel.editCard(it)
+                                        tab = AppTab.CREATE
+                                    },
+                                    onOpenDetails = { detailsCardId = it.id }
+                                )
+                                AppTab.SETTINGS -> SettingsScreen(
+                                    padding = padding,
+                                    cards = uiState.cards,
+                                    currentLanguage = uiState.appLanguage,
+                                    canUseGoogleWallet = uiState.canUseGoogleWallet,
+                                    walletIssuerId = uiState.walletIssuerId,
+                                    walletClassSuffix = uiState.walletClassSuffix,
+                                    walletBackendUrl = uiState.walletBackendUrl,
+                                    t = t,
+                                    onLanguageSelected = viewModel::updateLanguage,
+                                    onWalletSettingsChange = viewModel::updateWalletSettings,
+                                    onPersistWalletSettings = viewModel::persistWalletSettings,
+                                    onImportBackup = viewModel::importBackupFromUri
+                                )
+                            }
+                        }
+                    }
+                    OverlayScreen.DETAILS_SAVED -> {
+                        if (detailsCard == null) {
+                            LaunchedEffect(detailsCardId) { detailsCardId = null }
+                        } else {
+                            PassDetailsScreen(
+                                accentColor = parseColor(detailsCard.passColor),
+                                photoUri = detailsCard.photoUri,
+                                badgeText = t("pass"),
+                                title = detailsCard.name.ifBlank { "Sem nome" },
+                                subtitle = detailsCard.role.ifBlank { "" },
+                                tertiary = detailsCard.website.ifBlank { "" },
+                                lines = listOf(
+                                    t("phone") to detailsCard.phone.ifBlank { "Sem telefone" },
+                                    t("email") to detailsCard.email.ifBlank { "Sem email" },
+                                    t("instagram") to detailsCard.instagram.ifBlank { "Sem Instagram" },
+                                    t("linkedin") to detailsCard.linkedin.ifBlank { "Sem LinkedIn" },
+                                    t("note") to detailsCard.note.ifBlank { "Sem nota" }
+                                ),
+                                qrValue = detailsCard.qrValue,
+                                qrLabel = t("qr_code"),
+                                onBack = { detailsCardId = null }
+                            )
+                        }
+                    }
+                    OverlayScreen.DETAILS_DRAFT -> {
+                        PassDetailsScreen(
+                            accentColor = parseColor(uiState.draft.passColor),
+                            photoUri = uiState.draft.photoUri,
+                            badgeText = t("pass"),
+                            title = uiState.draft.name.ifBlank { "Seu nome" },
+                            subtitle = uiState.draft.role.ifBlank { "Cargo ou descrição" },
+                            tertiary = uiState.draft.website.ifBlank { "https://seu-link.com" },
+                            lines = listOf(
+                                t("phone") to uiState.draft.phone.ifBlank { "+55 00 00000-0000" },
+                                t("email") to uiState.draft.email.ifBlank { "email@exemplo.com" },
+                                t("instagram") to uiState.draft.instagram.ifBlank { "@instagram" },
+                                t("linkedin") to uiState.draft.linkedin.ifBlank { "linkedin.com/in/voce" },
+                                t("note") to uiState.draft.note.ifBlank { "Sem nota" }
+                            ),
+                            qrValue = uiState.draft.qrValue,
+                            qrLabel = t("qr_code"),
+                            onBack = { showDraftDetails = false }
+                        )
+                    }
                 }
-                AppTab.CREATE -> CreateScreen(
-                    padding = padding,
-                    draft = uiState.draft,
-                    canUseGoogleWallet = uiState.canUseGoogleWallet,
-                    walletIssuerId = uiState.walletIssuerId,
-                    walletClassSuffix = uiState.walletClassSuffix,
-                    walletBackendUrl = uiState.walletBackendUrl,
-                    t = t,
-                    onPickPhoto = onPickPhoto,
-                    onPickQrCode = onPickQrCode,
-                    onScanQrFromBitmap = viewModel::scanQrFromBitmap,
-                    onImportVCard = viewModel::importVCardFromUri,
-                    onDraftChange = viewModel::updateDraft,
-                    onWalletSettingsChange = viewModel::updateWalletSettings,
-                    onCreatePass = viewModel::saveDraft,
-                    onPersistWalletSettings = viewModel::persistWalletSettings,
-                    onClearDraft = viewModel::clearDraft,
-                    onClearQr = viewModel::clearDraftQr
-                )
-                AppTab.SAVED -> CardsScreen(padding, t("saved_head"), t("saved_sub"), "${uiState.cards.size} ${t("saved_count")}", uiState.cards, t, true, onSaveToWallet, { viewModel.deleteCard(it.id) }) {
-                    viewModel.editCard(it); tab = AppTab.CREATE
-                }
-                AppTab.SETTINGS -> SettingsScreen(
-                    padding = padding,
-                    cards = uiState.cards,
-                    currentLanguage = uiState.appLanguage,
-                    canUseGoogleWallet = uiState.canUseGoogleWallet,
-                    walletIssuerId = uiState.walletIssuerId,
-                    walletClassSuffix = uiState.walletClassSuffix,
-                    walletBackendUrl = uiState.walletBackendUrl,
-                    t = t,
-                    onLanguageSelected = viewModel::updateLanguage,
-                    onWalletSettingsChange = viewModel::updateWalletSettings,
-                    onPersistWalletSettings = viewModel::persistWalletSettings,
-                    onImportBackup = viewModel::importBackupFromUri
-                )
             }
+
+            ColorfulLoadingOverlay(
+                visible = showColorfulOverlay,
+                message = "gerar o cartão",
+                accentColor = parseColor(uiState.draft.passColor)
+            )
         }
     }
 }
@@ -193,11 +322,11 @@ private fun RowScope.PillItem(tab: AppTab, selected: AppTab, label: String, icon
 }
 
 @Composable
-private fun CardsScreen(padding: PaddingValues, title: String, subtitle: String, message: String, cards: List<VisitingCard>, t: (String) -> String, showDelete: Boolean, onSaveToWallet: (VisitingCard) -> Unit, onDelete: (VisitingCard) -> Unit, onEdit: (VisitingCard) -> Unit) {
+private fun CardsScreen(padding: PaddingValues, title: String, subtitle: String, message: String, cards: List<VisitingCard>, t: (String) -> String, showDelete: Boolean, onSaveToWallet: (VisitingCard) -> Unit, onDelete: (VisitingCard) -> Unit, onEdit: (VisitingCard) -> Unit, onOpenDetails: (VisitingCard) -> Unit) {
     LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 120.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
         item { ListHeader(title = title, subtitle = subtitle, message = message) }
         if (cards.isEmpty()) item { EmptyCard(t(if (showDelete) "saved_empty_title" else "home_empty_title"), t(if (showDelete) "saved_empty_body" else "home_empty_body")) }
-        else items(cards, key = { it.id }) { card -> SavedPassCard(card, t, showDelete, { onEdit(card) }, { onDelete(card) }, { onSaveToWallet(card) }) }
+        else items(cards, key = { it.id }) { card -> SavedPassCard(card, t, showDelete, { onEdit(card) }, { onDelete(card) }, { onSaveToWallet(card) }, { onOpenDetails(card) }) }
     }
 }
 
@@ -228,7 +357,8 @@ private fun CreateScreen(
     onCreatePass: () -> Unit,
     onPersistWalletSettings: () -> Unit,
     onClearDraft: () -> Unit,
-    onClearQr: () -> Unit
+    onClearQr: () -> Unit,
+    onOpenDraftDetails: () -> Unit
 ) {
     LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 120.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
         item {
@@ -248,7 +378,8 @@ private fun CreateScreen(
                 onCreatePass = onCreatePass,
                 onPersistWalletSettings = onPersistWalletSettings,
                 onClearDraft = onClearDraft,
-                onClearQr = onClearQr
+                onClearQr = onClearQr,
+                onOpenDraftDetails = onOpenDraftDetails
             )
         }
     }
@@ -271,7 +402,8 @@ private fun CreateInvitesEditorCard(
     onCreatePass: () -> Unit,
     onPersistWalletSettings: () -> Unit,
     onClearDraft: () -> Unit,
-    onClearQr: () -> Unit
+    onClearQr: () -> Unit,
+    onOpenDraftDetails: () -> Unit
 ) {
     val accentColor = parseColor(draft.passColor)
     var preview by rememberSaveable { mutableStateOf(false) }
@@ -360,7 +492,7 @@ private fun CreateInvitesEditorCard(
                         color = Color.Black.copy(alpha = 0.22f)
                     ) {
                         Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            DraftPreview(draft, t("pass"), t)
+                            DraftPreview(draft, t("pass"), t, onOpenDraftDetails)
                             Text(t("create_hint"), color = Color.White.copy(alpha = 0.85f), textAlign = TextAlign.Center)
                         }
                     }
@@ -618,9 +750,8 @@ private fun WalletCard(canUseGoogleWallet: Boolean, walletIssuerId: String, wall
 }
 
 @Composable
-private fun DraftPreview(draft: CardDraft, passLabel: String, t: (String) -> String) {
+private fun DraftPreview(draft: CardDraft, passLabel: String, t: (String) -> String, onOpenDetails: () -> Unit) {
     val c = parseColor(draft.passColor)
-    var expanded by rememberSaveable { mutableStateOf(false) }
     ExpandablePassCard(
         accentColor = c,
         photoUri = draft.photoUri,
@@ -635,35 +766,26 @@ private fun DraftPreview(draft: CardDraft, passLabel: String, t: (String) -> Str
         ),
         qrValue = draft.qrValue,
         qrLabel = t("qr_code"),
-        expanded = expanded,
-        onToggleExpanded = { expanded = !expanded },
+        expanded = false,
+        onToggleExpanded = onOpenDetails,
         footer = null
     )
 }
 
 @Composable
-private fun SavedPassCard(card: VisitingCard, t: (String) -> String, showDelete: Boolean, onEdit: () -> Unit, onDelete: () -> Unit, onSaveToWallet: () -> Unit) {
+private fun SavedPassCard(card: VisitingCard, t: (String) -> String, showDelete: Boolean, onEdit: () -> Unit, onDelete: () -> Unit, onSaveToWallet: () -> Unit, onOpenDetails: () -> Unit) {
     val accentColor = parseColor(card.passColor)
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var shareMenuExpanded by remember(card.id) { mutableStateOf(false) }
     val phone = card.phone.ifBlank { "Sem telefone" }
     val email = card.email.ifBlank { "Sem email" }
-    val allLines = listOf(
-        t("phone") to phone,
-        t("email") to email,
-        t("instagram") to card.instagram.ifBlank { "Sem Instagram" },
-        t("linkedin") to card.linkedin.ifBlank { "Sem LinkedIn" },
-        t("url") to card.website.ifBlank { "Sem URL" },
-        t("note") to card.note.ifBlank { "Sem nota" }
-    )
-    var expanded by rememberSaveable(card.id) { mutableStateOf(false) }
 
     ElevatedCard(
         modifier = Modifier
             .fillMaxWidth()
             .animateContentSize()
-            .clickable { expanded = !expanded },
+            .clickable { onOpenDetails() },
         shape = RoundedCornerShape(36.dp),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
     ) {
@@ -762,32 +884,6 @@ private fun SavedPassCard(card: VisitingCard, t: (String) -> String, showDelete:
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-
-                AnimatedVisibility(
-                    visible = expanded,
-                    enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
-                    exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()
-                ) {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(28.dp),
-                        color = Color.Black.copy(alpha = 0.22f)
-                    ) {
-                        Column(
-                            modifier = Modifier.fillMaxWidth().padding(14.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            allLines.forEach { (label, value) -> TicketLine(label, value) }
-                            if (card.qrValue.isNotBlank()) {
-                                Spacer(Modifier.height(6.dp))
-                                TicketQr(value = card.qrValue, label = t("qr_code"))
-                            } else {
-                                Spacer(Modifier.height(2.dp))
-                                TicketLine(t("qr_code"), "Sem QR code")
-                            }
-                        }
-                    }
-                }
 
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
@@ -888,6 +984,201 @@ private fun SavedPassCard(card: VisitingCard, t: (String) -> String, showDelete:
                             Text(t("delete"))
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PassDetailsScreen(
+    accentColor: Color,
+    photoUri: String,
+    badgeText: String,
+    title: String,
+    subtitle: String,
+    tertiary: String,
+    lines: List<Pair<String, String>>,
+    qrValue: String,
+    qrLabel: String,
+    onBack: () -> Unit
+) {
+    BackHandler(onBack = onBack)
+
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { visible = true }
+
+    Box(Modifier.fillMaxSize()) {
+        AnimatedColorfulGradient(
+            modifier = Modifier.matchParentSize(),
+            seed = accentColor,
+            alpha = 1f
+        )
+        Box(
+            Modifier
+                .matchParentSize()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color.Black.copy(alpha = 0.10f),
+                            Color.Black.copy(alpha = 0.35f),
+                            Color.Black.copy(alpha = 0.75f)
+                        )
+                    )
+                )
+        )
+
+        Scaffold(
+            containerColor = Color.Transparent,
+            topBar = {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    TextButton(onClick = onBack) {
+                        Icon(Icons.Rounded.ArrowBack, contentDescription = null, tint = Color.White)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Voltar", color = Color.White, fontWeight = FontWeight.SemiBold)
+                    }
+                    Text(
+                        title,
+                        modifier = Modifier.weight(1f),
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        ) { padding ->
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(padding),
+                contentPadding = PaddingValues(16.dp, 12.dp, 16.dp, 28.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                item {
+                    AnimatedVisibility(
+                        visible = visible,
+                        enter = fadeIn(tween(220)) + scaleIn(tween(260), initialScale = 0.96f),
+                        exit = fadeOut(tween(160)) + scaleOut(tween(200), targetScale = 0.98f)
+                    ) {
+                        PassExpandedCard(
+                            accentColor = accentColor,
+                            photoUri = photoUri,
+                            badgeText = badgeText,
+                            title = title,
+                            subtitle = subtitle,
+                            tertiary = tertiary,
+                            lines = lines,
+                            qrValue = qrValue,
+                            qrLabel = qrLabel
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PassExpandedCard(
+    accentColor: Color,
+    photoUri: String,
+    badgeText: String,
+    title: String,
+    subtitle: String,
+    tertiary: String,
+    lines: List<Pair<String, String>>,
+    qrValue: String,
+    qrLabel: String
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(32.dp)),
+        color = accentColor
+    ) {
+        Column(Modifier.fillMaxWidth().padding(2.dp)) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(30.dp)),
+                shape = RoundedCornerShape(30.dp),
+                color = accentColor
+            ) {
+                PassTicket(
+                    accentColor = accentColor,
+                    photoUri = photoUri,
+                    badgeText = badgeText,
+                    title = title,
+                    subtitle = subtitle,
+                    tertiary = tertiary,
+                    lines = lines,
+                    qrValue = qrValue,
+                    qrLabel = qrLabel
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AnimatedColorfulGradient(modifier: Modifier = Modifier, seed: Color, alpha: Float = 1f) {
+    val transition = rememberInfiniteTransition(label = "colorful-gradient")
+    val shiftX by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(2400, easing = LinearEasing), repeatMode = RepeatMode.Reverse),
+        label = "shift-x"
+    )
+    val shiftY by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(3200, easing = LinearEasing), repeatMode = RepeatMode.Reverse),
+        label = "shift-y"
+    )
+
+    val palette = listOf(
+        seed,
+        Color(0xFFFF6FD8),
+        Color(0xFF00C2FF),
+        Color(0xFFFFD54F),
+        seed
+    )
+
+    Box(
+        modifier = modifier.drawWithCache {
+            val start = Offset(size.width * shiftX, size.height * (0.15f + 0.85f * shiftY))
+            val end = Offset(size.width * (1f - shiftY), size.height * (0.85f - 0.70f * shiftX))
+            val brush = Brush.linearGradient(colors = palette, start = start, end = end)
+            onDrawBehind { drawRect(brush = brush, alpha = alpha) }
+        }
+    )
+}
+
+@Composable
+private fun ColorfulLoadingOverlay(visible: Boolean, message: String, accentColor: Color) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(tween(120)) + scaleIn(tween(220), initialScale = 0.96f),
+        exit = fadeOut(tween(200)) + scaleOut(tween(160), targetScale = 0.98f)
+    ) {
+        Box(Modifier.fillMaxSize()) {
+            AnimatedColorfulGradient(Modifier.matchParentSize(), seed = accentColor, alpha = 1f)
+            Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.45f)))
+            Surface(
+                modifier = Modifier.align(Alignment.Center),
+                shape = RoundedCornerShape(28.dp),
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
+            ) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 22.dp, vertical = 18.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(message, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text("Aguarde…", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
