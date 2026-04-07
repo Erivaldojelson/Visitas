@@ -40,7 +40,12 @@ object AppNotifications {
         return NotificationManagerCompat.from(context).canPostPromotedNotifications()
     }
 
-    fun postCardGenerationLiveUpdate(context: Context, cardName: String, criticalText: String = "Gerando") {
+    fun postCardGenerationLiveUpdate(
+        context: Context,
+        cardName: String,
+        criticalText: String = "Gerando",
+        requestPromoted: Boolean = false
+    ) {
         ensureChannels(context)
 
         val builder = NotificationCompat.Builder(context, CHANNEL_UPDATES)
@@ -54,7 +59,7 @@ object AppNotifications {
             .setProgress(0, 0, true)
             .setContentIntent(mainPendingIntent(context))
 
-        if (Build.VERSION.SDK_INT >= 36) {
+        if (Build.VERSION.SDK_INT >= 36 && requestPromoted) {
             builder
                 .setRequestPromotedOngoing(true)
                 .setShortCriticalText(criticalText)
@@ -63,7 +68,7 @@ object AppNotifications {
         NotificationManagerCompat.from(context).notify(NOTIFICATION_ID_CARD_STATUS, builder.build())
     }
 
-    fun postCardGenerationCompleted(context: Context, cardName: String) {
+    fun postCardGenerationCompleted(context: Context, cardName: String, requestPromoted: Boolean = false) {
         ensureChannels(context)
 
         val builder = NotificationCompat.Builder(context, CHANNEL_UPDATES)
@@ -75,7 +80,7 @@ object AppNotifications {
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setContentIntent(mainPendingIntent(context))
 
-        if (Build.VERSION.SDK_INT >= 36) {
+        if (Build.VERSION.SDK_INT >= 36 && requestPromoted) {
             builder.setRequestPromotedOngoing(false)
         }
 
@@ -125,4 +130,3 @@ object AppNotifications {
         return PendingIntent.getActivity(context, 0, intent, flags)
     }
 }
-

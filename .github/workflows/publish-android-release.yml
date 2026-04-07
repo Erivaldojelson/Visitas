@@ -9,7 +9,7 @@ on:
       tag:
         description: "Tag to publish (example: v1.0.1)"
         required: true
-        default: "v1.0.1"
+        default: "v1.9.0-alpha"
 
 permissions:
   contents: write
@@ -44,8 +44,14 @@ jobs:
       - name: Build release APK
         run: ./gradlew :app:assembleRelease
 
+      - name: Rename APK
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          mv app/build/outputs/apk/release/app-release.apk "app/build/outputs/apk/release/Visitas-${TAG}-release.apk"
+
       - name: Publish GitHub Release (attach APK)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
-          files: app/build/outputs/apk/release/app-release.apk
+          prerelease: ${{ contains(github.event.inputs.tag || github.ref_name, 'alpha') }}
+          files: app/build/outputs/apk/release/Visitas-${{ github.event.inputs.tag || github.ref_name }}-release.apk

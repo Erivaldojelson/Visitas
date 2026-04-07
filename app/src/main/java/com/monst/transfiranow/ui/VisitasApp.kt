@@ -89,6 +89,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -118,6 +119,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.google.zxing.BarcodeFormat
@@ -260,26 +264,37 @@ fun VisitasApp(
                                     onWalletSettingsChange = viewModel::updateWalletSettings,
                                     onCreatePass = {
                                         scope.launch {
-                                            val cardName = uiState.draft.name.trim()
-                                            val job = viewModel.saveDraft() ?: return@launch
+                                             val cardName = uiState.draft.name.trim()
+                                             val job = viewModel.saveDraft() ?: return@launch
 
-                                            val shouldNotify =
-                                                uiState.notificationsEnabled && AppNotifications.canPostNotifications(context)
+                                             val shouldNotify =
+                                                 uiState.notificationsEnabled && AppNotifications.canPostNotifications(context)
 
-                                            if (shouldNotify && uiState.liveUpdatesEnabled) {
-                                                AppNotifications.postCardGenerationLiveUpdate(context, cardName)
-                                            }
+                                             val canPromote = uiState.liveUpdatesEnabled &&
+                                                 AppNotifications.canPostPromotedNotifications(context)
+
+                                             if (shouldNotify && uiState.liveUpdatesEnabled) {
+                                                 AppNotifications.postCardGenerationLiveUpdate(
+                                                     context,
+                                                     cardName,
+                                                     requestPromoted = canPromote
+                                                 )
+                                             }
 
                                             showColorfulOverlay = true
                                             job.join()
                                             delay(1100)
-                                            showColorfulOverlay = false
+                                             showColorfulOverlay = false
 
-                                            if (shouldNotify) {
-                                                AppNotifications.postCardGenerationCompleted(context, cardName)
-                                            }
-                                        }
-                                    },
+                                             if (shouldNotify) {
+                                                 AppNotifications.postCardGenerationCompleted(
+                                                     context,
+                                                     cardName,
+                                                     requestPromoted = canPromote
+                                                 )
+                                             }
+                                         }
+                                     },
                                     onPersistWalletSettings = viewModel::persistWalletSettings,
                                     onClearDraft = viewModel::clearDraft,
                                     onClearQr = viewModel::clearDraftQr,
@@ -835,22 +850,101 @@ private fun SettingsScreen(
                 }
             }
             item {
-                val hasNotificationPermission = if (Build.VERSION.SDK_INT < 33) {
-                    true
-                } else {
-                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+                val lifecycleOwner = LocalLifecycleOwner.current
+                val isAndroid16 = Build.VERSION.SDK_INT >= 36
+                val promotedNotificationsPermission = "android.permission.POST_PROMOTED_NOTIFICATIONS"
+
+                fun checkNotificationPermission(): Boolean {
+                    if (Build.VERSION.SDK_INT < 33) return true
+                    return ContextCompat.checkSelfPermission(
+                        context,
+                        Manifest.permission.POST_NOTIFICATIONS
+                    ) == PackageManager.PERMISSION_GRANTED
                 }
 
-                val requestPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-                    if (granted) {
-                        AppNotifications.ensureChannels(context)
-                        onNotificationsEnabledChange(true)
-                        Toast.makeText(context, "Notificações ativadas.", Toast.LENGTH_SHORT).show()
-                    } else {
-                        onNotificationsEnabledChange(false)
-                        Toast.makeText(context, "Permissão de notificações negada.", Toast.LENGTH_LONG).show()
-                    }
+                fun checkPromotedPermission(): Boolean {
+                    if (!isAndroid16) return true
+                    return ContextCompat.checkSelfPermission(
+                        context,
+                        promotedNotificationsPermission
+                    ) == PackageManager.PERMISSION_GRANTED
                 }
+
+                fun checkSystemNotificationsEnabled(): Boolean {
+                    return AppNotifications.canPostNotifications(context)
+                }
+
+                fun checkCanPromote(): Boolean {
+                    if (!isAndroid16) return false
+                    return AppNotifications.canPostPromotedNotifications(context)
+                }
+
+                var hasNotificationPermission by remember { mutableStateOf(checkNotificationPermission()) }
+                var systemNotificationsEnabled by remember { mutableStateOf(checkSystemNotificationsEnabled()) }
+                var hasPromotedPermission by remember { mutableStateOf(checkPromotedPermission()) }
+                var canPromote by remember { mutableStateOf(checkCanPromote()) }
+
+                fun refreshNotificationStatus() {
+                    hasNotificationPermission = checkNotificationPermission()
+                    systemNotificationsEnabled = checkSystemNotificationsEnabled()
+                    hasPromotedPermission = checkPromotedPermission()
+                    canPromote = checkCanPromote()
+                }
+
+                DisposableEffect(lifecycleOwner) {
+                    val observer = LifecycleEventObserver { _, event ->
+                        if (event == Lifecycle.Event.ON_RESUME) {
+                            refreshNotificationStatus()
+                        }
+                    }
+                    lifecycleOwner.lifecycle.addObserver(observer)
+                    onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+                }
+
+                val requestPermission =
+                    rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+                        refreshNotificationStatus()
+                        if (granted) {
+                            AppNotifications.ensureChannels(context)
+                            onNotificationsEnabledChange(true)
+
+                            if (!systemNotificationsEnabled) {
+                                AppNotifications.openAppNotificationSettings(context)
+                                Toast.makeText(
+                                    context,
+                                    "Ative “Permitir notificações” nas configurações do sistema.",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            } else {
+                                Toast.makeText(context, "Notificações ativadas.", Toast.LENGTH_SHORT).show()
+                            }
+                        } else {
+                            onNotificationsEnabledChange(false)
+                            Toast.makeText(context, "Permissão de notificações negada.", Toast.LENGTH_LONG).show()
+                        }
+                    }
+
+                val requestPromotedPermission =
+                    rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+                        refreshNotificationStatus()
+                        if (granted) {
+                            onLiveUpdatesEnabledChange(true)
+
+                            if (!canPromote) {
+                                AppNotifications.openAppNotificationPromotionSettings(context)
+                                Toast.makeText(
+                                    context,
+                                    "Ative “Live notifications” nas configurações do sistema.",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            } else {
+                                Toast.makeText(context, "Live Updates ativado.", Toast.LENGTH_SHORT).show()
+                            }
+                        } else {
+                            onLiveUpdatesEnabledChange(false)
+                            Toast.makeText(context, "Permissão de Live Updates negada.", Toast.LENGTH_LONG).show()
+                        }
+                    }
 
                 LaunchedEffect(hasNotificationPermission, notificationsEnabled) {
                     if (notificationsEnabled && !hasNotificationPermission) {
@@ -858,13 +952,8 @@ private fun SettingsScreen(
                     }
                 }
 
-                val isAndroid16 = Build.VERSION.SDK_INT >= 36
-                val canPromote = if (isAndroid16) AppNotifications.canPostPromotedNotifications(context) else false
-
-                LaunchedEffect(canPromote, liveUpdatesEnabled, notificationsEnabled) {
+                LaunchedEffect(notificationsEnabled, liveUpdatesEnabled) {
                     if (!notificationsEnabled && liveUpdatesEnabled) {
-                        onLiveUpdatesEnabledChange(false)
-                    } else if (liveUpdatesEnabled && !canPromote) {
                         onLiveUpdatesEnabledChange(false)
                     }
                 }
@@ -885,9 +974,15 @@ private fun SettingsScreen(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     style = MaterialTheme.typography.bodyMedium
                                 )
-                                if (!hasNotificationPermission && Build.VERSION.SDK_INT >= 33) {
+                                if (Build.VERSION.SDK_INT >= 33 && !hasNotificationPermission) {
                                     Text(
-                                        "Permita nas configurações do sistema para funcionar.",
+                                        "Permita a permissão de notificações para funcionar.",
+                                        color = MaterialTheme.colorScheme.error,
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                } else if (!systemNotificationsEnabled) {
+                                    Text(
+                                        "Ative “Permitir notificações” nas configurações do sistema.",
                                         color = MaterialTheme.colorScheme.error,
                                         style = MaterialTheme.typography.bodyMedium
                                     )
@@ -895,7 +990,7 @@ private fun SettingsScreen(
                             }
                             Spacer(Modifier.width(12.dp))
                             Switch(
-                                checked = notificationsEnabled && hasNotificationPermission,
+                                checked = notificationsEnabled,
                                 onCheckedChange = { enabled ->
                                     if (!enabled) {
                                         onNotificationsEnabledChange(false)
@@ -909,12 +1004,21 @@ private fun SettingsScreen(
                                     } else {
                                         AppNotifications.ensureChannels(context)
                                         onNotificationsEnabledChange(true)
+
+                                        if (!systemNotificationsEnabled) {
+                                            AppNotifications.openAppNotificationSettings(context)
+                                            Toast.makeText(
+                                                context,
+                                                "Ative “Permitir notificações” nas configurações do sistema.",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        }
                                     }
                                 }
                             )
                         }
 
-                        if (!hasNotificationPermission && Build.VERSION.SDK_INT >= 33) {
+                        if ((Build.VERSION.SDK_INT >= 33 && !hasNotificationPermission) || !systemNotificationsEnabled) {
                             FilledTonalButton(onClick = { AppNotifications.openAppNotificationSettings(context) }) {
                                 Text("Abrir configurações de notificações")
                             }
@@ -946,9 +1050,15 @@ private fun SettingsScreen(
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             style = MaterialTheme.typography.bodyMedium
                                         )
-                                        if (isAndroid16 && notificationsEnabled && !canPromote) {
+                                        if (isAndroid16 && notificationsEnabled && liveUpdatesEnabled && !hasPromotedPermission) {
                                             Text(
-                                                "Ative 'Live Updates' nas configurações do sistema.",
+                                                "Permita a permissão de Live Updates para funcionar.",
+                                                color = MaterialTheme.colorScheme.error,
+                                                style = MaterialTheme.typography.bodyMedium
+                                            )
+                                        } else if (isAndroid16 && notificationsEnabled && liveUpdatesEnabled && !canPromote) {
+                                            Text(
+                                                "Ative “Live notifications” nas configurações do sistema.",
                                                 color = MaterialTheme.colorScheme.error,
                                                 style = MaterialTheme.typography.bodyMedium
                                             )
@@ -956,7 +1066,7 @@ private fun SettingsScreen(
                                     }
                                     Spacer(Modifier.width(12.dp))
                                     Switch(
-                                        checked = liveUpdatesEnabled && canPromote,
+                                        checked = liveUpdatesEnabled,
                                         onCheckedChange = { enabled ->
                                             if (!enabled) {
                                                 onLiveUpdatesEnabledChange(false)
@@ -973,27 +1083,36 @@ private fun SettingsScreen(
                                                 return@Switch
                                             }
 
-                                            if (!canPromote) {
-                                                AppNotifications.openAppNotificationPromotionSettings(context)
-                                                Toast.makeText(context, "Ative o Live Update e volte aqui.", Toast.LENGTH_LONG).show()
+                                            if (!hasPromotedPermission) {
+                                                requestPromotedPermission.launch(promotedNotificationsPermission)
                                                 return@Switch
                                             }
 
                                             onLiveUpdatesEnabledChange(true)
+
+                                            if (!canPromote) {
+                                                AppNotifications.openAppNotificationPromotionSettings(context)
+                                                Toast.makeText(context, "Ative “Live notifications” e volte aqui.", Toast.LENGTH_LONG).show()
+                                                return@Switch
+                                            }
                                         },
                                         enabled = notificationsEnabled && isAndroid16
                                     )
                                 }
 
-                                if (isAndroid16 && notificationsEnabled && !canPromote) {
-                                    FilledTonalButton(onClick = { AppNotifications.openAppNotificationPromotionSettings(context) }) {
+                                if (isAndroid16 && notificationsEnabled && !hasPromotedPermission) {
+                                    FilledTonalButton(onClick = { requestPromotedPermission.launch(promotedNotificationsPermission) }) {
                                         Text("Permitir Live Updates")
+                                    }
+                                } else if (isAndroid16 && notificationsEnabled && liveUpdatesEnabled && !canPromote) {
+                                    FilledTonalButton(onClick = { AppNotifications.openAppNotificationPromotionSettings(context) }) {
+                                        Text("Abrir configurações de Live Updates")
                                     }
                                 }
                             }
                         }
 
-                        if (notificationsEnabled && hasNotificationPermission) {
+                        if (notificationsEnabled && hasNotificationPermission && systemNotificationsEnabled) {
                             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                 FilledTonalButton(
                                     onClick = {
@@ -1009,10 +1128,15 @@ private fun SettingsScreen(
                                             AppNotifications.postCardGenerationLiveUpdate(
                                                 context,
                                                 "Cartão de teste",
-                                                criticalText = "Teste"
+                                                criticalText = "Teste",
+                                                requestPromoted = true
                                             )
                                             delay(2000)
-                                            AppNotifications.postCardGenerationCompleted(context, "Cartão de teste")
+                                            AppNotifications.postCardGenerationCompleted(
+                                                context,
+                                                "Cartão de teste",
+                                                requestPromoted = true
+                                            )
                                         }
                                     },
                                     modifier = Modifier.weight(1f),
