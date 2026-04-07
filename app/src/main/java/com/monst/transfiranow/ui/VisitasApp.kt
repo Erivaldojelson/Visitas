@@ -270,14 +270,13 @@ fun VisitasApp(
                                              val shouldNotify =
                                                  uiState.notificationsEnabled && AppNotifications.canPostNotifications(context)
 
-                                             val canPromote = uiState.liveUpdatesEnabled &&
-                                                 AppNotifications.canPostPromotedNotifications(context)
+                                             val requestPromoted = uiState.liveUpdatesEnabled
 
                                              if (shouldNotify && uiState.liveUpdatesEnabled) {
                                                  AppNotifications.postCardGenerationLiveUpdate(
                                                      context,
                                                      cardName,
-                                                     requestPromoted = canPromote
+                                                     requestPromoted = requestPromoted
                                                  )
                                              }
 
@@ -290,7 +289,7 @@ fun VisitasApp(
                                                  AppNotifications.postCardGenerationCompleted(
                                                      context,
                                                      cardName,
-                                                     requestPromoted = canPromote
+                                                     requestPromoted = requestPromoted
                                                  )
                                              }
                                          }
@@ -1083,6 +1082,10 @@ private fun SettingsScreen(
                                                 criticalText = "Teste",
                                                 requestPromoted = true
                                             )
+                                            delay(400)
+                                            if (!canPromote) {
+                                                AppNotifications.openAppNotificationPromotionSettings(context)
+                                            }
                                             delay(2000)
                                             AppNotifications.postCardGenerationCompleted(
                                                 context,
@@ -1092,7 +1095,7 @@ private fun SettingsScreen(
                                         }
                                     },
                                     modifier = Modifier.weight(1f),
-                                    enabled = isAndroid16 && canPromote && liveUpdatesEnabled
+                                    enabled = isAndroid16 && liveUpdatesEnabled
                                 ) {
                                     Text("Testar Live Update")
                                 }
