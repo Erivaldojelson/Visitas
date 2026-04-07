@@ -1,5 +1,11 @@
 # Changelog
 
+## Visitas 1.8.2 - 2026-04-07
+
+- Cartão abre em uma nova tela de detalhes (sem expansão dentro da lista).
+- Transições com animações spring (efeito elástico suave, estilo iOS).
+- Fundo cinza com pontos brilhantes (efeito fluido/orgânico) nas telas de detalhes e no “gerar o cartão”.
+
 ## Visitas 1.0.0 - 2026-04-01
 
 - Recriacao do projeto como app de cartoes pessoais.
