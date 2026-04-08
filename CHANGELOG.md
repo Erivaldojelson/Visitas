@@ -1,5 +1,9 @@
 # Changelog
 
+## Visitas 1.9.0-alpha.4 - 2026-04-08
+
+- Now Bar/Live Update: ícone da pílula (notificação recolhida) trocado para uma pessoa.
+
 ## Visitas 1.9.0-alpha.3 - 2026-04-08
 
 - Correção: Live Update/Now Bar volta a aparecer no Android 16+ (notificação promovida sem `colorized` e sem BigPicture no modo promovido).

@@ -152,7 +152,7 @@ class EventModeService : Service() {
         )
 
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_stat_download)
+            .setSmallIcon(R.drawable.ic_stat_person)
             .setContentTitle(title)
             .setContentText(text)
             .setColor(pillColor)

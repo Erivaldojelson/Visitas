@@ -64,7 +64,7 @@ object AppNotifications {
         ensureChannels(context)
 
         val builder = NotificationCompat.Builder(context, CHANNEL_UPDATES)
-            .setSmallIcon(R.drawable.ic_stat_download)
+            .setSmallIcon(R.drawable.ic_stat_person)
             .setContentTitle("Gerando cartão")
             .setContentText(cardName.ifBlank { "Aguarde…" })
             .apply {
@@ -95,7 +95,7 @@ object AppNotifications {
         ensureChannels(context)
 
         val builder = NotificationCompat.Builder(context, CHANNEL_UPDATES)
-            .setSmallIcon(R.drawable.ic_stat_download)
+            .setSmallIcon(R.drawable.ic_stat_person)
             .setContentTitle("Cartão gerado")
             .setContentText(cardName.ifBlank { "Seu passe já está salvo." })
             .setOngoing(false)
