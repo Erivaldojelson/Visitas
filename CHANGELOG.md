@@ -6,6 +6,7 @@
 - Live Updates (Android 16+): direciona para a opção “Live notifications” nas configurações do sistema, atualizando o status ao voltar para o app.
 - Live Updates: botão de teste agora dispara um Live Update para ajudar a opção aparecer no sistema.
 - Live Updates: seletor de cor da pílula da Now Bar (espectro completo).
+- Live Updates: chip mais curto e atalho para reativar o canal “Modo Evento” quando estiver desativado.
 - Modo Evento (Android 16+): serviço em primeiro plano com cronômetro e timeout (59 min) para aumentar a chance de aparecer na Now Bar.
 - Home → Recentes: atalho de “Modo apresentação” para o cartão mais recente (sem botão dentro do cartão).
 - Ao criar um cartão: inicia automaticamente a Now Bar com nome, cargo, celular e Instagram.

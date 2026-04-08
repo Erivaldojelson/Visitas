@@ -305,6 +305,16 @@ fun VisitasApp(
                                               if (shouldNotify) {
                                                   if (uiState.liveUpdatesEnabled) {
                                                       AppNotifications.cancelCardStatus(context)
+                                                      AppNotifications.ensureChannels(context)
+                                                      if (!AppNotifications.isEventChannelEnabled(context)) {
+                                                          AppNotifications.openEventChannelSettings(context)
+                                                          AppNotifications.postCardGenerationCompleted(
+                                                              context,
+                                                              cardName,
+                                                              requestPromoted = false
+                                                          )
+                                                          return@launch
+                                                      }
                                                       AppNotifications.startEventMode(
                                                           context,
                                                           title = cardName.ifBlank { t("presentation_mode") },
@@ -501,6 +511,13 @@ private fun CardsScreen(padding: PaddingValues, title: String, subtitle: String,
                                     if (!AppNotifications.canPostNotifications(context)) {
                                         showToast(context, "Ative as notificações para funcionar.")
                                         AppNotifications.openAppNotificationSettings(context)
+                                        return@FilledTonalButton
+                                    }
+
+                                    AppNotifications.ensureChannels(context)
+                                    if (!AppNotifications.isEventChannelEnabled(context)) {
+                                        showToast(context, "Ative o canal “Modo Evento” para aparecer na Now Bar.")
+                                        AppNotifications.openEventChannelSettings(context)
                                         return@FilledTonalButton
                                     }
 

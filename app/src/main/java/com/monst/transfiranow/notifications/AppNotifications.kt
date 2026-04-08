@@ -126,6 +126,34 @@ object AppNotifications {
         }
     }
 
+    fun isEventChannelEnabled(context: Context): Boolean {
+        return isChannelEnabled(context, CHANNEL_EVENT)
+    }
+
+    fun openEventChannelSettings(context: Context) {
+        openChannelSettings(context, CHANNEL_EVENT)
+    }
+
+    private fun isChannelEnabled(context: Context, channelId: String): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return true
+        val manager = context.getSystemService(NotificationManager::class.java) ?: return true
+        val channel = manager.getNotificationChannel(channelId) ?: return true
+        return channel.importance != NotificationManager.IMPORTANCE_NONE
+    }
+
+    private fun openChannelSettings(context: Context, channelId: String) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            openAppNotificationSettings(context)
+            return
+        }
+
+        val intent = Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+            .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+            .putExtra(Settings.EXTRA_CHANNEL_ID, channelId)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        startIntentSafely(context, intent)
+    }
+
     fun startEventMode(
         context: Context,
         title: String = "Modo Evento Ativo",

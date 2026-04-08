@@ -193,9 +193,16 @@ class EventModeService : Service() {
         }
 
         if (Build.VERSION.SDK_INT >= 36) {
+            val chip = card?.name
+                ?.trim()
+                ?.split(" ")
+                ?.firstOrNull()
+                ?.take(10)
+                ?.takeIf { it.isNotBlank() }
+                ?: "Cartão"
             builder
                 .setRequestPromotedOngoing(true)
-                .setShortCriticalText(title.trim().ifBlank { "Evento" })
+                .setShortCriticalText(chip)
         }
 
         return builder.build()
