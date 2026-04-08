@@ -21,6 +21,7 @@ Na implementação mais recente foi, implemtado o Live update compátivel com a 
 - Integra com o Google Wallet Android SDK para iniciar o fluxo de salvar passe.
 - Gera o payload do passe generico no app e envia esse payload para um backend que assina o JWT.
 - Mostra as informações dos cartões na Now bar ou no Live Update da samsung.
+- Adptável a todos os formatos de tela incluíndo (Dobráveis e tablets).
 
 ## Arquitetura do Google Wallet **Brevemente**
 
