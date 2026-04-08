@@ -203,8 +203,8 @@ class EventModeService : Service() {
             builder.setLargeIcon(largeIcon)
         }
 
-        if (card != null) {
-            val expandedLines = buildList {
+        val expandedLines = if (card != null) {
+            buildList {
                 role.takeIf { it.isNotBlank() }?.let { add("Cargo: $it") }
                 phone.takeIf { it.isNotBlank() }?.let { add("Telefone: $it") }
                 email.takeIf { it.isNotBlank() }?.let { add("Email: $it") }
@@ -212,15 +212,29 @@ class EventModeService : Service() {
                 linkedin.takeIf { it.isNotBlank() }?.let { add("LinkedIn: $it") }
                 website.takeIf { it.isNotBlank() }?.let { add("URL: $it") }
             }
-            val style = NotificationCompat.InboxStyle()
-            style.setBigContentTitle(title)
-            expandedLines.take(6).forEach { line -> style.addLine(line) }
-            style.setSummaryText(summary.ifBlank { "Toque para compartilhar seu cartão" })
-            builder.setStyle(style)
-        } else if (summary.isNotBlank()) {
+        } else {
+            emptyList()
+        }
+
+        if (Build.VERSION.SDK_INT < 36 && qrBitmap != null) {
+            builder.setStyle(
+                NotificationCompat.BigPictureStyle()
+                    .bigPicture(qrBitmap)
+                    .bigLargeIcon(null as Bitmap?)
+                    .setSummaryText(summary)
+            )
+        } else if (card != null || summary.isNotBlank()) {
+            val header = text.trim().ifBlank { "Toque para compartilhar seu cartão" }
+            val bigText = buildString {
+                append(header)
+                if (expandedLines.isNotEmpty()) {
+                    append("\n\n")
+                    append(expandedLines.take(6).joinToString("\n"))
+                }
+            }
             builder.setStyle(
                 NotificationCompat.BigTextStyle()
-                    .bigText(text)
+                    .bigText(bigText)
                     .setSummaryText(summary)
             )
         }
