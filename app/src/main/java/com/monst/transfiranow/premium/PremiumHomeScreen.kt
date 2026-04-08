@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
@@ -33,6 +34,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,10 +42,13 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import android.os.Build
+import android.widget.Toast
 import coil.compose.AsyncImage
 import com.monst.transfiranow.data.VisitingCard
 import com.monst.transfiranow.ui.VisitasViewModel
 import androidx.compose.runtime.collectAsState
+import com.monst.transfiranow.notifications.AppNotifications
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -54,6 +59,7 @@ fun PremiumHomeScreen(
     onClose: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -77,10 +83,70 @@ fun PremiumHomeScreen(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding),
+            .padding(padding),
             contentPadding = PaddingValues(18.dp, 10.dp, 18.dp, 120.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            if (uiState.cards.isNotEmpty()) {
+                item {
+                    val latest = uiState.cards.first()
+                    ElevatedCard(shape = RoundedCornerShape(28.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(18.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text("Modo Evento", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                                Text(
+                                    latest.name.ifBlank { "Cartão mais recente" },
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            FilledTonalButton(
+                                onClick = {
+                                    if (uiState.eventModeEnabled) {
+                                        AppNotifications.stopEventMode(context)
+                                        Toast.makeText(context, "Modo Evento encerrado.", Toast.LENGTH_SHORT).show()
+                                        return@FilledTonalButton
+                                    }
+
+                                    if (!AppNotifications.canPostNotifications(context)) {
+                                        Toast.makeText(context, "Ative as notificações para funcionar.", Toast.LENGTH_LONG).show()
+                                        AppNotifications.openAppNotificationSettings(context)
+                                        return@FilledTonalButton
+                                    }
+
+                                    AppNotifications.ensureChannels(context)
+                                    if (!AppNotifications.isEventChannelEnabled(context)) {
+                                        Toast.makeText(context, "Ative o canal “Modo Evento” para aparecer na Now Bar.", Toast.LENGTH_LONG).show()
+                                        AppNotifications.openEventChannelSettings(context)
+                                        return@FilledTonalButton
+                                    }
+
+                                    AppNotifications.startEventMode(
+                                        context,
+                                        title = "Modo Evento Ativo",
+                                        text = latest.name.ifBlank { "Seu cartão está pronto para compartilhar" },
+                                        cardId = latest.id
+                                    )
+
+                                    if (Build.VERSION.SDK_INT >= 36 && !AppNotifications.canPostPromotedNotifications(context)) {
+                                        Toast.makeText(context, "Permita Live Updates para aparecer na Now Bar.", Toast.LENGTH_LONG).show()
+                                        AppNotifications.openAppNotificationPromotionSettings(context)
+                                    } else {
+                                        Toast.makeText(context, "Modo Evento ativado.", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            ) {
+                                Text(if (uiState.eventModeEnabled) "Encerrar" else "Ativar")
+                            }
+                        }
+                    }
+                }
+            }
             items(uiState.cards, key = { it.id }) { card ->
                 PremiumCardRow(card = card, onClick = { onOpen(card) })
             }
@@ -188,4 +254,3 @@ private fun PremiumCardRow(card: VisitingCard, onClick: () -> Unit) {
         }
     }
 }
-

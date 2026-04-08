@@ -1,5 +1,10 @@
 # Changelog
 
+## Visitas 1.9.0-alpha.2 - 2026-04-08
+
+- UI Premium → Recentes: adiciona atalho de Modo Evento para o cartão mais recente.
+- Modo Evento: estado ativo/inativo agora é persistido e o botão muda para “Encerrar” quando estiver ativo.
+
 ## Visitas 1.9.0-alpha - 2026-04-07
 
 - Configurações → Notificações: fluxo guiado para ativar permissões e abrir as configurações do sistema quando o app estiver bloqueado.

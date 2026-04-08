@@ -24,6 +24,7 @@ class CardStore(private val context: Context) {
     private val appLockKey = booleanPreferencesKey("app_lock_enabled")
     private val notificationsEnabledKey = booleanPreferencesKey("notifications_enabled")
     private val liveUpdatesEnabledKey = booleanPreferencesKey("live_updates_enabled")
+    private val eventModeEnabledKey = booleanPreferencesKey("event_mode_enabled")
     private val nowBarColorKey = intPreferencesKey("now_bar_color")
 
     val uiStateFlow: Flow<CardsUiState> = context.dataStore.data.map { preferences ->
@@ -36,6 +37,7 @@ class CardStore(private val context: Context) {
             appLockEnabled = preferences[appLockKey] ?: false,
             notificationsEnabled = preferences[notificationsEnabledKey] ?: false,
             liveUpdatesEnabled = preferences[liveUpdatesEnabledKey] ?: false,
+            eventModeEnabled = preferences[eventModeEnabledKey] ?: false,
             nowBarColor = preferences[nowBarColorKey] ?: DEFAULT_NOW_BAR_COLOR
         )
     }
@@ -105,6 +107,12 @@ class CardStore(private val context: Context) {
     suspend fun persistLiveUpdatesEnabled(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[liveUpdatesEnabledKey] = enabled
+        }
+    }
+
+    suspend fun persistEventModeEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[eventModeEnabledKey] = enabled
         }
     }
 

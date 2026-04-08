@@ -53,6 +53,7 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
                         appLockEnabled = persisted.appLockEnabled,
                         notificationsEnabled = persisted.notificationsEnabled,
                         liveUpdatesEnabled = persisted.liveUpdatesEnabled,
+                        eventModeEnabled = persisted.eventModeEnabled,
                         nowBarColor = persisted.nowBarColor,
                         statusMessage = if (it.statusMessage == CardsUiState().statusMessage) {
                             message(persisted.appLanguage, "create_intro")

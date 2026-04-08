@@ -58,6 +58,7 @@ data class CardsUiState(
     val appLockEnabled: Boolean = false,
     val notificationsEnabled: Boolean = false,
     val liveUpdatesEnabled: Boolean = false,
+    val eventModeEnabled: Boolean = false,
     val nowBarColor: Int = DEFAULT_NOW_BAR_COLOR,
     val canUseGoogleWallet: Boolean = false,
     val statusMessage: String = "Crie um passe, salve no app e depois envie para o Google Wallet.",

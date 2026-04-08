@@ -38,6 +38,9 @@ class EventModeService : Service() {
     override fun onDestroy() {
         timeoutJob?.cancel()
         presentationJob?.cancel()
+        scope.launch {
+            runCatching { CardStore(applicationContext).persistEventModeEnabled(false) }
+        }
         super.onDestroy()
     }
 
@@ -60,6 +63,10 @@ class EventModeService : Service() {
 
     private fun startEventMode(title: String, text: String, durationMs: Long, cardId: String?) {
         AppNotifications.ensureChannels(this)
+
+        scope.launch {
+            runCatching { CardStore(applicationContext).persistEventModeEnabled(true) }
+        }
 
         val endAt = System.currentTimeMillis() + durationMs
         val notification = buildNotification(
@@ -121,6 +128,9 @@ class EventModeService : Service() {
 
     private fun stopEventMode() {
         timeoutJob?.cancel()
+        scope.launch {
+            runCatching { CardStore(applicationContext).persistEventModeEnabled(false) }
+        }
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         stopSelf()
     }

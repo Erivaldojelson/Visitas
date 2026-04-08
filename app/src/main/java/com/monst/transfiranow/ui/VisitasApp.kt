@@ -240,6 +240,7 @@ fun VisitasApp(
                                     message = "",
                                     cards = uiState.cards.take(10),
                                     t = t,
+                                    eventModeEnabled = uiState.eventModeEnabled,
                                     showDelete = false,
                                     onSaveToWallet = onSaveToWallet,
                                     onDelete = {},
@@ -347,6 +348,7 @@ fun VisitasApp(
                                     message = "${uiState.cards.size} ${t("saved_count")}",
                                     cards = uiState.cards,
                                     t = t,
+                                    eventModeEnabled = uiState.eventModeEnabled,
                                     showDelete = true,
                                     onSaveToWallet = onSaveToWallet,
                                     onDelete = { viewModel.deleteCard(it.id) },
@@ -474,7 +476,7 @@ private fun RowScope.PillItem(tab: AppTab, selected: AppTab, label: String, icon
 }
 
 @Composable
-private fun CardsScreen(padding: PaddingValues, title: String, subtitle: String, message: String, cards: List<VisitingCard>, t: (String) -> String, showDelete: Boolean, onSaveToWallet: (VisitingCard) -> Unit, onDelete: (VisitingCard) -> Unit, onEdit: (VisitingCard) -> Unit, onOpenDetails: (VisitingCard) -> Unit) {
+private fun CardsScreen(padding: PaddingValues, title: String, subtitle: String, message: String, cards: List<VisitingCard>, t: (String) -> String, eventModeEnabled: Boolean, showDelete: Boolean, onSaveToWallet: (VisitingCard) -> Unit, onDelete: (VisitingCard) -> Unit, onEdit: (VisitingCard) -> Unit, onOpenDetails: (VisitingCard) -> Unit) {
     BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
         val side = adaptiveSidePadding(maxWidth, maxContentWidth = 720.dp)
         LazyColumn(
@@ -508,6 +510,12 @@ private fun CardsScreen(padding: PaddingValues, title: String, subtitle: String,
                             }
                             FilledTonalButton(
                                 onClick = {
+                                    if (eventModeEnabled) {
+                                        AppNotifications.stopEventMode(context)
+                                        showToast(context, "Modo Evento encerrado.")
+                                        return@FilledTonalButton
+                                    }
+
                                     if (!AppNotifications.canPostNotifications(context)) {
                                         showToast(context, "Ative as notificações para funcionar.")
                                         AppNotifications.openAppNotificationSettings(context)
@@ -528,14 +536,14 @@ private fun CardsScreen(padding: PaddingValues, title: String, subtitle: String,
                                         cardId = latest.id
                                     )
 
-                                    if (Build.VERSION.SDK_INT >= 36 && !AppNotifications.canPostPromotedNotifications(context)) {
-                                        showToast(context, t("live_updates_denied"))
-                                        AppNotifications.openAppNotificationPromotionSettings(context)
-                                    } else {
-                                        showToast(context, t("presentation_started"))
-                                    }
+                                     if (Build.VERSION.SDK_INT >= 36 && !AppNotifications.canPostPromotedNotifications(context)) {
+                                         showToast(context, t("live_updates_denied"))
+                                         AppNotifications.openAppNotificationPromotionSettings(context)
+                                     } else {
+                                         showToast(context, t("presentation_started"))
+                                     }
                                 }
-                            ) { Text("Ativar") }
+                            ) { Text(if (eventModeEnabled) "Encerrar" else "Ativar") }
                         }
                     }
                 }
