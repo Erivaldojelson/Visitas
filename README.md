@@ -74,3 +74,7 @@ O APK atual gerado para distribuicao manual fica em:
 
 - Adicionar exportacao de imagem ou PDF do cartao.
 - Criar uma build release assinada para distribuicao publica.
+
+## Direitos autorais
+
+© 2026 Erivaldojelson. Todos os direitos reservados.
