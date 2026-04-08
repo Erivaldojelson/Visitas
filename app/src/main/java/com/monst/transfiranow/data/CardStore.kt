@@ -65,6 +65,14 @@ class CardStore(private val context: Context) {
         persistCards(updated)
     }
 
+    suspend fun getCardById(id: String): VisitingCard? {
+        if (id.isBlank()) return null
+        return context.dataStore.data
+            .map { parseCards(it[cardsKey].orEmpty()) }
+            .first()
+            .firstOrNull { it.id == id }
+    }
+
     suspend fun persistSettings(issuerId: String, classSuffix: String, backendUrl: String) {
         context.dataStore.edit { preferences ->
             preferences[issuerKey] = issuerId.trim()

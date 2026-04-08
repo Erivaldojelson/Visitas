@@ -128,13 +128,15 @@ object AppNotifications {
         context: Context,
         title: String = "Modo Evento Ativo",
         text: String = "Seu cartão está pronto para compartilhar",
-        durationMs: Long = 59L * 60L * 1000L
+        durationMs: Long = 59L * 60L * 1000L,
+        cardId: String? = null
     ) {
         ensureChannels(context)
         val intent = Intent(context, EventModeService::class.java).apply {
             putExtra(EventModeService.EXTRA_TITLE, title)
             putExtra(EventModeService.EXTRA_TEXT, text)
             putExtra(EventModeService.EXTRA_DURATION_MS, durationMs)
+            cardId?.trim()?.takeIf { it.isNotBlank() }?.let { putExtra(EventModeService.EXTRA_CARD_ID, it) }
         }
         ContextCompat.startForegroundService(context, intent)
     }

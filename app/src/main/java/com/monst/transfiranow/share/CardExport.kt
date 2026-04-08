@@ -22,6 +22,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.nio.charset.StandardCharsets
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 object CardExport {
     fun exportPng(context: Context, card: VisitingCard): Uri {
@@ -80,6 +81,18 @@ object CardExport {
         }
 
         return lines.joinToString(separator = "\n", postfix = "\n")
+    }
+
+    fun renderNotificationThumbnail(context: Context, card: VisitingCard, maxWidth: Int = 512): Bitmap {
+        val full = renderShareBitmap(context, card)
+        val targetWidth = maxWidth.coerceAtLeast(128).coerceAtMost(full.width)
+        val targetHeight = (full.height.toFloat() * (targetWidth.toFloat() / full.width.toFloat())).roundToInt().coerceAtLeast(1)
+
+        if (targetWidth == full.width && targetHeight == full.height) return full
+
+        val scaled = Bitmap.createScaledBitmap(full, targetWidth, targetHeight, true)
+        if (scaled != full) full.recycle()
+        return scaled
     }
 
     private fun escapeVCard(value: String): String {
