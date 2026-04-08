@@ -5,9 +5,11 @@
 - Configurações → Notificações: fluxo guiado para ativar permissões e abrir as configurações do sistema quando o app estiver bloqueado.
 - Live Updates (Android 16+): direciona para a opção “Live notifications” nas configurações do sistema, atualizando o status ao voltar para o app.
 - Live Updates: botão de teste agora dispara um Live Update para ajudar a opção aparecer no sistema.
+- Live Updates: seletor de cor da pílula da Now Bar (espectro completo).
 - Modo Evento (Android 16+): serviço em primeiro plano com cronômetro e timeout (59 min) para aumentar a chance de aparecer na Now Bar.
-- Home → Recentes: botão “Modo apresentação” no cartão para ativar o Live Update/Now Bar sob demanda.
-- Live Update/Now Bar: a notificação do modo apresentação mostra nome, cargo, celular e QR Code.
+- Home → Recentes: atalho de “Modo apresentação” para o cartão mais recente (sem botão dentro do cartão).
+- Ao criar um cartão: inicia automaticamente a Now Bar com nome, cargo, celular e Instagram.
+- Live Update/Now Bar: mostra nome, cargo, celular, Instagram e QR Code.
 
 ## Visitas 1.8.5 - 2026-04-07
 

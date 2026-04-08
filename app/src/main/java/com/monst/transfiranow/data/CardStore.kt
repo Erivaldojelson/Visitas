@@ -3,6 +3,7 @@ package com.monst.transfiranow.data
 import android.content.Context
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.first
@@ -23,6 +24,7 @@ class CardStore(private val context: Context) {
     private val appLockKey = booleanPreferencesKey("app_lock_enabled")
     private val notificationsEnabledKey = booleanPreferencesKey("notifications_enabled")
     private val liveUpdatesEnabledKey = booleanPreferencesKey("live_updates_enabled")
+    private val nowBarColorKey = intPreferencesKey("now_bar_color")
 
     val uiStateFlow: Flow<CardsUiState> = context.dataStore.data.map { preferences ->
         CardsUiState(
@@ -33,7 +35,8 @@ class CardStore(private val context: Context) {
             appLanguage = AppLanguage.fromCode(preferences[languageKey].orEmpty()),
             appLockEnabled = preferences[appLockKey] ?: false,
             notificationsEnabled = preferences[notificationsEnabledKey] ?: false,
-            liveUpdatesEnabled = preferences[liveUpdatesEnabledKey] ?: false
+            liveUpdatesEnabled = preferences[liveUpdatesEnabledKey] ?: false,
+            nowBarColor = preferences[nowBarColorKey] ?: DEFAULT_NOW_BAR_COLOR
         )
     }
 
@@ -103,6 +106,16 @@ class CardStore(private val context: Context) {
         context.dataStore.edit { preferences ->
             preferences[liveUpdatesEnabledKey] = enabled
         }
+    }
+
+    suspend fun persistNowBarColor(color: Int) {
+        context.dataStore.edit { preferences ->
+            preferences[nowBarColorKey] = color
+        }
+    }
+
+    suspend fun getNowBarColor(): Int {
+        return context.dataStore.data.first()[nowBarColorKey] ?: DEFAULT_NOW_BAR_COLOR
     }
 
     suspend fun replaceCards(cards: List<VisitingCard>) {

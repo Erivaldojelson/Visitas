@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
+import java.util.UUID
 
 class VisitasViewModel(application: Application) : AndroidViewModel(application) {
     private val store = CardStore(application)
@@ -52,6 +53,7 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
                         appLockEnabled = persisted.appLockEnabled,
                         notificationsEnabled = persisted.notificationsEnabled,
                         liveUpdatesEnabled = persisted.liveUpdatesEnabled,
+                        nowBarColor = persisted.nowBarColor,
                         statusMessage = if (it.statusMessage == CardsUiState().statusMessage) {
                             message(persisted.appLanguage, "create_intro")
                         } else {
@@ -309,11 +311,20 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun setNowBarColor(color: Int) {
+        _uiState.update { it.copy(nowBarColor = color) }
+        viewModelScope.launch {
+            store.persistNowBarColor(color)
+        }
+    }
+
     fun setWalletAvailability(available: Boolean) {
         _uiState.update { it.copy(canUseGoogleWallet = available) }
     }
 
-    fun saveDraft(): Job? {
+    data class SaveDraftResult(val job: Job, val cardId: String)
+
+    fun saveDraft(): SaveDraftResult? {
         val state = _uiState.value
         val draft = state.draft
         if (draft.name.isBlank()) {
@@ -321,8 +332,11 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
             return null
         }
 
-        return viewModelScope.launch {
-            store.saveCard(draft)
+        val cardId = draft.id ?: UUID.randomUUID().toString()
+        val draftToSave = draft.copy(id = cardId)
+
+        val job = viewModelScope.launch {
+            store.saveCard(draftToSave)
             MyCardWidgetProvider.requestUpdate(getApplication())
             _uiState.update {
                 it.copy(
@@ -331,6 +345,8 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
                 )
             }
         }
+
+        return SaveDraftResult(job = job, cardId = cardId)
     }
 
     fun deleteCard(id: String) {

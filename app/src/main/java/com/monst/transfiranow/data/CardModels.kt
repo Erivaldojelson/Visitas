@@ -13,6 +13,8 @@ enum class AppLanguage(val code: String) {
     }
 }
 
+const val DEFAULT_NOW_BAR_COLOR: Int = 0xFF1E3A8A.toInt()
+
 data class VisitingCard(
     val id: String,
     val name: String,
@@ -56,6 +58,7 @@ data class CardsUiState(
     val appLockEnabled: Boolean = false,
     val notificationsEnabled: Boolean = false,
     val liveUpdatesEnabled: Boolean = false,
+    val nowBarColor: Int = DEFAULT_NOW_BAR_COLOR,
     val canUseGoogleWallet: Boolean = false,
     val statusMessage: String = "Crie um passe, salve no app e depois envie para o Google Wallet.",
     val isSavingToWallet: Boolean = false

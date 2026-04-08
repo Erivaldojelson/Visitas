@@ -18,6 +18,7 @@ import com.google.zxing.MultiFormatWriter
 import com.monst.transfiranow.MainActivity
 import com.monst.transfiranow.R
 import com.monst.transfiranow.data.CardStore
+import com.monst.transfiranow.data.DEFAULT_NOW_BAR_COLOR
 import com.monst.transfiranow.data.VisitingCard
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -61,7 +62,15 @@ class EventModeService : Service() {
         AppNotifications.ensureChannels(this)
 
         val endAt = System.currentTimeMillis() + durationMs
-        val notification = buildNotification(title = title, text = text, endAt = endAt, durationMs = durationMs, card = null, qrBitmap = null)
+        val notification = buildNotification(
+            title = title,
+            text = text,
+            endAt = endAt,
+            durationMs = durationMs,
+            card = null,
+            qrBitmap = null,
+            pillColor = DEFAULT_NOW_BAR_COLOR
+        )
 
         val serviceType = if (Build.VERSION.SDK_INT >= 34) {
             ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
@@ -72,33 +81,35 @@ class EventModeService : Service() {
         ServiceCompat.startForeground(this, NOTIFICATION_ID, notification, serviceType)
 
         presentationJob?.cancel()
-        if (!cardId.isNullOrBlank()) {
-            presentationJob = scope.launch {
-                val card = withContext(Dispatchers.IO) {
-                    CardStore(applicationContext).getCardById(cardId)
-                } ?: return@launch
+        presentationJob = scope.launch {
+            val store = CardStore(applicationContext)
+            val pillColor = withContext(Dispatchers.IO) { store.getNowBarColor() }
 
-                val qrValue = card.qrValue.trim().ifBlank { card.website.trim() }
-                val qrBitmap = qrValue.takeIf { it.isNotBlank() }?.let { value ->
-                    runCatching {
-                        withContext(Dispatchers.Default) {
-                            generateQrBitmap(value, size = 512)
-                        }
-                    }.getOrNull()
-                }
-
-                val updatedTitle = card.name.trim().ifBlank { title }
-                val updatedText = presentationLine(card).ifBlank { text }
-                val updated = buildNotification(
-                    title = updatedTitle,
-                    text = updatedText,
-                    endAt = endAt,
-                    durationMs = durationMs,
-                    card = card,
-                    qrBitmap = qrBitmap
-                )
-                NotificationManagerCompat.from(applicationContext).notify(NOTIFICATION_ID, updated)
+            val card = cardId?.takeIf { it.isNotBlank() }?.let { id ->
+                withContext(Dispatchers.IO) { store.getCardById(id) }
             }
+
+            val qrValue = card?.qrValue?.trim().orEmpty().ifBlank { card?.website?.trim().orEmpty() }
+            val qrBitmap = qrValue.takeIf { it.isNotBlank() }?.let { value ->
+                runCatching {
+                    withContext(Dispatchers.Default) {
+                        generateQrBitmap(value, size = 512)
+                    }
+                }.getOrNull()
+            }
+
+            val updatedTitle = card?.name?.trim().orEmpty().ifBlank { title }
+            val updatedText = card?.let(::presentationLine).orEmpty().ifBlank { text }
+            val updated = buildNotification(
+                title = updatedTitle,
+                text = updatedText,
+                endAt = endAt,
+                durationMs = durationMs,
+                card = card,
+                qrBitmap = qrBitmap,
+                pillColor = pillColor
+            )
+            NotificationManagerCompat.from(applicationContext).notify(NOTIFICATION_ID, updated)
         }
 
         timeoutJob?.cancel()
@@ -114,7 +125,7 @@ class EventModeService : Service() {
         stopSelf()
     }
 
-    private fun buildNotification(title: String, text: String, endAt: Long, durationMs: Long, card: VisitingCard?, qrBitmap: Bitmap?): android.app.Notification {
+    private fun buildNotification(title: String, text: String, endAt: Long, durationMs: Long, card: VisitingCard?, qrBitmap: Bitmap?, pillColor: Int): android.app.Notification {
         val mainIntent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
@@ -134,6 +145,8 @@ class EventModeService : Service() {
             .setSmallIcon(R.drawable.ic_stat_download)
             .setContentTitle(title)
             .setContentText(text)
+            .setColor(pillColor)
+            .setColorized(true)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setAutoCancel(false)
@@ -159,8 +172,15 @@ class EventModeService : Service() {
                 qrBitmap
             }
 
-            val summary = listOfNotNull(card?.role?.trim()?.takeIf { it.isNotBlank() }, phone.takeIf { it.isNotBlank() })
-                .joinToString(" • ")
+            val instagram = card?.instagram?.trim().orEmpty()
+                .takeIf { it.isNotBlank() }
+                ?.let { if (it.startsWith("@")) it else "@$it" }
+
+            val summary = listOfNotNull(
+                card?.role?.trim()?.takeIf { it.isNotBlank() },
+                phone.takeIf { it.isNotBlank() },
+                instagram
+            ).joinToString(" • ")
 
             builder
                 .setLargeIcon(largeIcon)
@@ -184,10 +204,18 @@ class EventModeService : Service() {
     private fun presentationLine(card: VisitingCard): String {
         val role = card.role.trim()
         val phone = card.phone.trim()
+        val instagram = card.instagram.trim()
+            .takeIf { it.isNotBlank() }
+            ?.let { if (it.startsWith("@")) it else "@$it" }
+            .orEmpty()
         return when {
+            role.isNotBlank() && phone.isNotBlank() && instagram.isNotBlank() -> "$role • $phone • $instagram"
             role.isNotBlank() && phone.isNotBlank() -> "$role • $phone"
+            role.isNotBlank() && instagram.isNotBlank() -> "$role • $instagram"
+            phone.isNotBlank() && instagram.isNotBlank() -> "$phone • $instagram"
             role.isNotBlank() -> role
             phone.isNotBlank() -> phone
+            instagram.isNotBlank() -> instagram
             else -> ""
         }
     }

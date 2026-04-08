@@ -85,6 +85,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -264,8 +265,23 @@ fun VisitasApp(
                                     onWalletSettingsChange = viewModel::updateWalletSettings,
                                     onCreatePass = {
                                         scope.launch {
-                                             val cardName = uiState.draft.name.trim()
-                                             val job = viewModel.saveDraft() ?: return@launch
+                                             val draft = uiState.draft
+                                             val cardName = draft.name.trim()
+                                             val role = draft.role.trim()
+                                             val phone = draft.phone.trim()
+                                             val instagram = draft.instagram.trim()
+                                                 .takeIf { it.isNotBlank() }
+                                                 ?.let { if (it.startsWith("@")) it else "@$it" }
+                                                 .orEmpty()
+                                             val presentationText = listOfNotNull(
+                                                 role.takeIf { it.isNotBlank() },
+                                                 phone.takeIf { it.isNotBlank() },
+                                                 instagram.takeIf { it.isNotBlank() }
+                                             ).joinToString(" • ").ifBlank { cardName.ifBlank { "Seu cartão está pronto para compartilhar" } }
+
+                                             val saveResult = viewModel.saveDraft() ?: return@launch
+                                             val job = saveResult.job
+                                             val cardId = saveResult.cardId
 
                                              val shouldNotify =
                                                  uiState.notificationsEnabled && AppNotifications.canPostNotifications(context)
@@ -276,7 +292,8 @@ fun VisitasApp(
                                                  AppNotifications.postCardGenerationLiveUpdate(
                                                      context,
                                                      cardName,
-                                                     requestPromoted = requestPromoted
+                                                     requestPromoted = requestPromoted,
+                                                     pillColor = uiState.nowBarColor
                                                  )
                                              }
 
@@ -290,9 +307,14 @@ fun VisitasApp(
                                                       AppNotifications.cancelCardStatus(context)
                                                       AppNotifications.startEventMode(
                                                           context,
-                                                          title = "Modo Evento Ativo",
-                                                          text = cardName.ifBlank { "Seu cartão está pronto para compartilhar" }
+                                                          title = cardName.ifBlank { t("presentation_mode") },
+                                                          text = presentationText,
+                                                          cardId = cardId
                                                       )
+                                                      delay(400)
+                                                      if (Build.VERSION.SDK_INT >= 36 && !AppNotifications.canPostPromotedNotifications(context)) {
+                                                          AppNotifications.openAppNotificationPromotionSettings(context)
+                                                      }
                                                   } else {
                                                       AppNotifications.postCardGenerationCompleted(
                                                           context,
@@ -331,6 +353,7 @@ fun VisitasApp(
                                     appLockEnabled = uiState.appLockEnabled,
                                     notificationsEnabled = uiState.notificationsEnabled,
                                     liveUpdatesEnabled = uiState.liveUpdatesEnabled,
+                                    nowBarColor = uiState.nowBarColor,
                                     canUseGoogleWallet = uiState.canUseGoogleWallet,
                                     walletIssuerId = uiState.walletIssuerId,
                                     walletClassSuffix = uiState.walletClassSuffix,
@@ -340,6 +363,7 @@ fun VisitasApp(
                                     onAppLockEnabledChange = viewModel::setAppLockEnabled,
                                     onNotificationsEnabledChange = viewModel::setNotificationsEnabled,
                                     onLiveUpdatesEnabledChange = viewModel::setLiveUpdatesEnabled,
+                                    onNowBarColorChange = viewModel::setNowBarColor,
                                     onWalletSettingsChange = viewModel::updateWalletSettings,
                                     onPersistWalletSettings = viewModel::persistWalletSettings,
                                     onImportBackup = viewModel::importBackupFromUri
@@ -449,6 +473,56 @@ private fun CardsScreen(padding: PaddingValues, title: String, subtitle: String,
             verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
             item { ListHeader(title = title, subtitle = subtitle, message = message) }
+            if (!showDelete && cards.isNotEmpty()) {
+                item {
+                    val context = LocalContext.current
+                    val latest = cards.first()
+                    ElevatedCard(
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(t("presentation_mode"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
+                                Text(
+                                    latest.name.ifBlank { "Cartão mais recente" },
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            FilledTonalButton(
+                                onClick = {
+                                    if (!AppNotifications.canPostNotifications(context)) {
+                                        showToast(context, "Ative as notificações para funcionar.")
+                                        AppNotifications.openAppNotificationSettings(context)
+                                        return@FilledTonalButton
+                                    }
+
+                                    AppNotifications.startEventMode(
+                                        context,
+                                        title = t("presentation_mode"),
+                                        text = latest.name.ifBlank { "Seu cartão está pronto para compartilhar" },
+                                        cardId = latest.id
+                                    )
+
+                                    if (Build.VERSION.SDK_INT >= 36 && !AppNotifications.canPostPromotedNotifications(context)) {
+                                        showToast(context, t("live_updates_denied"))
+                                        AppNotifications.openAppNotificationPromotionSettings(context)
+                                    } else {
+                                        showToast(context, t("presentation_started"))
+                                    }
+                                }
+                            ) { Text("Ativar") }
+                        }
+                    }
+                }
+            }
             if (cards.isEmpty()) item { EmptyCard(t(if (showDelete) "saved_empty_title" else "home_empty_title"), t(if (showDelete) "saved_empty_body" else "home_empty_body")) }
             else items(cards, key = { it.id }) { card -> SavedPassCard(card, t, showDelete, { onEdit(card) }, { onDelete(card) }, { onSaveToWallet(card) }, { onOpenDetails(card) }) }
         }
@@ -774,6 +848,7 @@ private fun SettingsScreen(
     appLockEnabled: Boolean,
     notificationsEnabled: Boolean,
     liveUpdatesEnabled: Boolean,
+    nowBarColor: Int,
     canUseGoogleWallet: Boolean,
     walletIssuerId: String,
     walletClassSuffix: String,
@@ -783,6 +858,7 @@ private fun SettingsScreen(
     onAppLockEnabledChange: (Boolean) -> Unit,
     onNotificationsEnabledChange: (Boolean) -> Unit,
     onLiveUpdatesEnabledChange: (Boolean) -> Unit,
+    onNowBarColorChange: (Int) -> Unit,
     onWalletSettingsChange: (String?, String?, String?) -> Unit,
     onPersistWalletSettings: () -> Unit,
     onImportBackup: (Uri) -> Unit
@@ -1068,6 +1144,77 @@ private fun SettingsScreen(
                                     FilledTonalButton(onClick = { AppNotifications.openAppNotificationPromotionSettings(context) }) {
                                         Text("Permitir Live Updates")
                                     }
+                                }
+                            }
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(22.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh
+                        ) {
+                            Column(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Text("Cor da Now Bar", style = MaterialTheme.typography.titleMedium)
+                                Text(
+                                    if (isAndroid16) {
+                                        "Escolha a cor da pílula do Live Update/Now Bar."
+                                    } else {
+                                        "Disponível somente no Android 16 ou superior."
+                                    },
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+
+                                val spectrum = remember {
+                                    listOf(0f, 60f, 120f, 180f, 240f, 300f, 360f).map { hue ->
+                                        Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, 1f, 1f)))
+                                    }
+                                }
+
+                                val initialHue = remember(nowBarColor) {
+                                    val hsv = FloatArray(3)
+                                    android.graphics.Color.colorToHSV(nowBarColor, hsv)
+                                    hsv[0]
+                                }
+                                var hue by remember(nowBarColor) { mutableStateOf(initialHue) }
+                                var previewColor by remember(nowBarColor) { mutableStateOf(nowBarColor) }
+
+                                Box(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .height(12.dp)
+                                        .clip(RoundedCornerShape(999.dp))
+                                        .background(Brush.horizontalGradient(spectrum))
+                                )
+
+                                Slider(
+                                    value = hue,
+                                    onValueChange = { value ->
+                                        hue = value
+                                        previewColor = android.graphics.Color.HSVToColor(floatArrayOf(value, 1f, 1f))
+                                    },
+                                    valueRange = 0f..360f,
+                                    enabled = isAndroid16,
+                                    onValueChangeFinished = { onNowBarColorChange(previewColor) }
+                                )
+
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Box(
+                                        Modifier
+                                            .size(22.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(previewColor))
+                                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
+                                    )
+                                    Text(
+                                        "#%06X".format(0xFFFFFF and previewColor),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
                                 }
                             }
                         }
@@ -1429,26 +1576,6 @@ private fun SavedPassCard(card: VisitingCard, t: (String) -> String, showDelete:
                                         }
                                     }
                                 )
-                            }
-                        }
-                        if (!showDelete) {
-                            FilledTonalButton(
-                                onClick = {
-                                    if (Build.VERSION.SDK_INT >= 36 && !AppNotifications.canPostPromotedNotifications(context)) {
-                                        showToast(context, t("live_updates_denied"))
-                                        AppNotifications.openAppNotificationPromotionSettings(context)
-                                    }
-                                    AppNotifications.startEventMode(
-                                        context,
-                                        title = t("presentation_mode"),
-                                        text = card.name.ifBlank { "Seu cartão está pronto para compartilhar" },
-                                        cardId = card.id
-                                    )
-                                    showToast(context, t("presentation_started"))
-                                },
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text(t("presentation_mode"))
                             }
                         }
                         WalletActionButton(onClick = onSaveToWallet, label = t("wallet_add"), modifier = Modifier.weight(1f))

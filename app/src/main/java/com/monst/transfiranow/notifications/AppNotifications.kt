@@ -58,7 +58,8 @@ object AppNotifications {
         context: Context,
         cardName: String,
         criticalText: String = "Gerando",
-        requestPromoted: Boolean = false
+        requestPromoted: Boolean = false,
+        pillColor: Int? = null
     ) {
         ensureChannels(context)
 
@@ -66,6 +67,7 @@ object AppNotifications {
             .setSmallIcon(R.drawable.ic_stat_download)
             .setContentTitle("Gerando cartão")
             .setContentText(cardName.ifBlank { "Aguarde…" })
+            .apply { pillColor?.let { setColor(it).setColorized(true) } }
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setAutoCancel(false)
