@@ -12,7 +12,7 @@ android {
         applicationId = "com.monst.transfiranow"
         minSdk = 29
         targetSdk = 36
-        versionCode = 22
+        versionCode = 23
         versionName = "1.9.0-alpha"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

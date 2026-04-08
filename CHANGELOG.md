@@ -7,7 +7,7 @@
 - Live Updates: botão de teste agora dispara um Live Update para ajudar a opção aparecer no sistema.
 - Modo Evento (Android 16+): serviço em primeiro plano com cronômetro e timeout (59 min) para aumentar a chance de aparecer na Now Bar.
 - Home → Recentes: botão “Modo apresentação” no cartão para ativar o Live Update/Now Bar sob demanda.
-- Live Update/Now Bar: a notificação do modo apresentação agora exibe miniatura do cartão.
+- Live Update/Now Bar: a notificação do modo apresentação mostra nome, cargo, celular e QR Code.
 
 ## Visitas 1.8.5 - 2026-04-07
 

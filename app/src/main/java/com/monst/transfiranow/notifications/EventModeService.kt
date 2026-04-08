@@ -5,16 +5,20 @@ import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.graphics.Bitmap
+import android.graphics.Color
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.app.TaskStackBuilder
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.EncodeHintType
+import com.google.zxing.MultiFormatWriter
 import com.monst.transfiranow.MainActivity
 import com.monst.transfiranow.R
 import com.monst.transfiranow.data.CardStore
-import com.monst.transfiranow.share.CardExport
+import com.monst.transfiranow.data.VisitingCard
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -26,13 +30,13 @@ import kotlinx.coroutines.withContext
 class EventModeService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var timeoutJob: Job? = null
-    private var thumbnailJob: Job? = null
+    private var presentationJob: Job? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
         timeoutJob?.cancel()
-        thumbnailJob?.cancel()
+        presentationJob?.cancel()
         super.onDestroy()
     }
 
@@ -57,7 +61,7 @@ class EventModeService : Service() {
         AppNotifications.ensureChannels(this)
 
         val endAt = System.currentTimeMillis() + durationMs
-        val notification = buildNotification(title = title, text = text, endAt = endAt, durationMs = durationMs, thumbnail = null)
+        val notification = buildNotification(title = title, text = text, endAt = endAt, durationMs = durationMs, card = null, qrBitmap = null)
 
         val serviceType = if (Build.VERSION.SDK_INT >= 34) {
             ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
@@ -67,23 +71,33 @@ class EventModeService : Service() {
 
         ServiceCompat.startForeground(this, NOTIFICATION_ID, notification, serviceType)
 
-        thumbnailJob?.cancel()
+        presentationJob?.cancel()
         if (!cardId.isNullOrBlank()) {
-            thumbnailJob = scope.launch {
+            presentationJob = scope.launch {
                 val card = withContext(Dispatchers.IO) {
                     CardStore(applicationContext).getCardById(cardId)
                 } ?: return@launch
 
-                val bitmap = runCatching {
-                    withContext(Dispatchers.Default) {
-                        CardExport.renderNotificationThumbnail(applicationContext, card)
-                    }
-                }.getOrNull()
-
-                if (bitmap != null) {
-                    val updated = buildNotification(title = title, text = text, endAt = endAt, durationMs = durationMs, thumbnail = bitmap)
-                    NotificationManagerCompat.from(applicationContext).notify(NOTIFICATION_ID, updated)
+                val qrValue = card.qrValue.trim().ifBlank { card.website.trim() }
+                val qrBitmap = qrValue.takeIf { it.isNotBlank() }?.let { value ->
+                    runCatching {
+                        withContext(Dispatchers.Default) {
+                            generateQrBitmap(value, size = 512)
+                        }
+                    }.getOrNull()
                 }
+
+                val updatedTitle = card.name.trim().ifBlank { title }
+                val updatedText = presentationLine(card).ifBlank { text }
+                val updated = buildNotification(
+                    title = updatedTitle,
+                    text = updatedText,
+                    endAt = endAt,
+                    durationMs = durationMs,
+                    card = card,
+                    qrBitmap = qrBitmap
+                )
+                NotificationManagerCompat.from(applicationContext).notify(NOTIFICATION_ID, updated)
             }
         }
 
@@ -100,7 +114,7 @@ class EventModeService : Service() {
         stopSelf()
     }
 
-    private fun buildNotification(title: String, text: String, endAt: Long, durationMs: Long, thumbnail: Bitmap?): android.app.Notification {
+    private fun buildNotification(title: String, text: String, endAt: Long, durationMs: Long, card: VisitingCard?, qrBitmap: Bitmap?): android.app.Notification {
         val mainIntent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
@@ -129,26 +143,70 @@ class EventModeService : Service() {
             .setWhen(endAt)
             .setTimeoutAfter(durationMs)
             .setContentIntent(mainPendingIntent)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .addAction(R.drawable.ic_stat_download, "Encerrar", stopPendingIntent)
 
-        if (thumbnail != null) {
+        val phone = card?.phone?.trim().orEmpty()
+        if (phone.isNotBlank()) {
+            builder.setSubText(phone)
+        }
+
+        if (qrBitmap != null) {
+            val largeIcon = if (qrBitmap.width > 256) {
+                Bitmap.createScaledBitmap(qrBitmap, 256, 256, true)
+            } else {
+                qrBitmap
+            }
+
+            val summary = listOfNotNull(card?.role?.trim()?.takeIf { it.isNotBlank() }, phone.takeIf { it.isNotBlank() })
+                .joinToString(" • ")
+
             builder
-                .setLargeIcon(thumbnail)
+                .setLargeIcon(largeIcon)
                 .setStyle(
                     NotificationCompat.BigPictureStyle()
-                        .bigPicture(thumbnail)
+                        .bigPicture(qrBitmap)
                         .bigLargeIcon(null as Bitmap?)
+                        .setSummaryText(summary)
                 )
         }
 
         if (Build.VERSION.SDK_INT >= 36) {
             builder
                 .setRequestPromotedOngoing(true)
-                .setShortCriticalText("Evento")
+                .setShortCriticalText(title.trim().ifBlank { "Evento" })
         }
 
         return builder.build()
+    }
+
+    private fun presentationLine(card: VisitingCard): String {
+        val role = card.role.trim()
+        val phone = card.phone.trim()
+        return when {
+            role.isNotBlank() && phone.isNotBlank() -> "$role • $phone"
+            role.isNotBlank() -> role
+            phone.isNotBlank() -> phone
+            else -> ""
+        }
+    }
+
+    private fun generateQrBitmap(value: String, size: Int): Bitmap {
+        val matrix = MultiFormatWriter().encode(
+            value,
+            BarcodeFormat.QR_CODE,
+            size,
+            size,
+            mapOf(EncodeHintType.MARGIN to 1)
+        )
+        return Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888).apply {
+            for (x in 0 until size) {
+                for (y in 0 until size) {
+                    setPixel(x, y, if (matrix[x, y]) Color.BLACK else Color.WHITE)
+                }
+            }
+        }
     }
 
     companion object {
