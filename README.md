@@ -2,6 +2,8 @@
 
 `Visitas` e um app Android em Kotlin com Jetpack Compose para criar cartoes pessoais personalizados, salvar esses cartoes localmente e enviar um passe generico para o Google Wallet pelo caminho oficial.
 
+Na implementação mais recente foi, implemtado o Live update compátivel com a NOW BAR da samsung.
+
 ## Versao
 
 - `1.0.0`
@@ -18,8 +20,9 @@
 - Permite trocar o idioma do app para Portugues (Brasil, Portugal e Angola), Ingles e Chines.
 - Integra com o Google Wallet Android SDK para iniciar o fluxo de salvar passe.
 - Gera o payload do passe generico no app e envia esse payload para um backend que assina o JWT.
+- Mostra as informações dos cartões na Now bar ou no Live Update da samsung.
 
-## Arquitetura do Google Wallet
+## Arquitetura do Google Wallet **Brevemente**
 
 O app segue o caminho oficial do Google Wallet:
 
