@@ -3,13 +3,15 @@
 Backend para o app `Visitas` com:
 
 - API de cartões (`/cards`) que gera um QR Code (base64 PNG) e retorna o payload usado pelo app Android
-- assinatura do JWT do Google Wallet (`/wallet/sign`) para o botão “Salvar no Google Wallet”
+- geração do link do Google Wallet (`/wallet/save-url`) no formato `https://pay.google.com/gp/v/save/{JWT}`
+- (opcional) assinatura bruta do JWT (`/wallet/sign`) caso você queira enviar o payload pronto
 
 ## Endpoints
 
 - `GET /health`
 - `POST /cards`
 - `GET /cards/{id}`
+- `POST /wallet/save-url`
 - `POST /wallet/sign`
 
 ## Contrato do app (Cards)
@@ -48,6 +50,8 @@ Use o arquivo `.env.example` como base:
 - `CARDS_PUBLIC_BASE_URL`
 - `CARDS_DATA_DIR`
 - `GOOGLE_WALLET_ORIGINS`
+- `GOOGLE_WALLET_ISSUER_ID`
+- `GOOGLE_WALLET_CLASS_SUFFIX` (ou `GOOGLE_WALLET_CLASS_ID`)
 - `GOOGLE_SERVICE_ACCOUNT_EMAIL`
 - `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY`
 
@@ -65,6 +69,8 @@ PORT=8080
 CARDS_PUBLIC_BASE_URL=http://localhost:8080
 CARDS_DATA_DIR=./data
 GOOGLE_WALLET_ORIGINS=http://localhost:3000
+GOOGLE_WALLET_ISSUER_ID=0000000000000000000
+GOOGLE_WALLET_CLASS_SUFFIX=visitas_card
 GOOGLE_SERVICE_ACCOUNT_EMAIL=wallet-signer@seu-projeto.iam.gserviceaccount.com
 GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIIEv...\n-----END PRIVATE KEY-----\n"
 ```
@@ -136,6 +142,35 @@ O backend completa:
 e depois assina via `RS256`.
 
 O arquivo `sample-payload.json` neste diretorio serve como ponto de partida para esse teste.
+
+### Gerar link do Wallet (recomendado)
+
+```powershell
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://localhost:8080/wallet/save-url" `
+  -ContentType "application/json" `
+  -Body (@{
+    cardId = "uuid-do-cartao"
+    name = "Seu Nome"
+    role = "Seu cargo"
+    phone = "+55 31 00000-0000"
+    email = "email@exemplo.com"
+    instagram = "@seuuser"
+    linkedin = "seuuser"
+    website = "https://example.com"
+    note = "Nota opcional"
+    passColor = "#1E3A8A"
+    qrValue = "https://example.com"
+    photoUrl = "https://example.com/photo.png"
+  } | ConvertTo-Json)
+```
+
+Resposta:
+
+```json
+{ "url": "https://pay.google.com/gp/v/save/..." }
+```
 
 ## Deploy na Oracle Cloud (Always Free)
 

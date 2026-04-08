@@ -29,6 +29,7 @@ object CardsBackup {
                             .put("website", card.website)
                             .put("note", card.note)
                             .put("photoUri", card.photoUri)
+                            .put("avatarEmoji", card.avatarEmoji)
                             .put("walletPhotoUrl", card.walletPhotoUrl)
                             .put("qrValue", card.qrValue)
                             .put("passColor", card.passColor)
@@ -71,6 +72,7 @@ object CardsBackup {
                         website = item.optString("website"),
                         note = item.optString("note"),
                         photoUri = item.optString("photoUri"),
+                        avatarEmoji = item.optString("avatarEmoji", item.optString("emoji")),
                         walletPhotoUrl = item.optString("walletPhotoUrl"),
                         qrValue = item.optString("qrValue"),
                         passColor = item.optString("passColor", item.optString("hexColor", "#1E3A8A")),
@@ -89,4 +91,3 @@ object CardsBackup {
         )
     }
 }
-

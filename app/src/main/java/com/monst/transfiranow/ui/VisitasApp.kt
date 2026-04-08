@@ -187,6 +187,7 @@ class PassDetailsActivity : ComponentActivity() {
                 website = intent.getStringExtra(EXTRA_DRAFT_WEBSITE).orEmpty(),
                 note = intent.getStringExtra(EXTRA_DRAFT_NOTE).orEmpty(),
                 photoUri = intent.getStringExtra(EXTRA_DRAFT_PHOTO_URI).orEmpty(),
+                avatarEmoji = intent.getStringExtra(EXTRA_DRAFT_AVATAR_EMOJI).orEmpty(),
                 qrValue = intent.getStringExtra(EXTRA_DRAFT_QR_VALUE).orEmpty(),
                 passColor = intent.getStringExtra(EXTRA_DRAFT_PASS_COLOR) ?: CardDraft().passColor
             )
@@ -212,6 +213,7 @@ class PassDetailsActivity : ComponentActivity() {
                             PassDetailsScreen(
                                 accentColor = parseColor(draft.passColor),
                                 photoUri = draft.photoUri,
+                                avatarEmoji = draft.avatarEmoji,
                                 badgeText = t("pass"),
                                 title = draft.name.ifBlank { "Seu nome" },
                                 subtitle = draft.role.ifBlank { "Cargo ou descrição" },
@@ -246,6 +248,7 @@ class PassDetailsActivity : ComponentActivity() {
                                 PassDetailsScreen(
                                     accentColor = parseColor(currentCard.passColor),
                                     photoUri = currentCard.photoUri,
+                                    avatarEmoji = currentCard.avatarEmoji,
                                     badgeText = t("pass"),
                                     title = currentCard.name.ifBlank { "Sem nome" },
                                     subtitle = currentCard.role.ifBlank { "" },
@@ -285,6 +288,7 @@ class PassDetailsActivity : ComponentActivity() {
         const val EXTRA_DRAFT_WEBSITE = "draft_website"
         const val EXTRA_DRAFT_NOTE = "draft_note"
         const val EXTRA_DRAFT_PHOTO_URI = "draft_photo_uri"
+        const val EXTRA_DRAFT_AVATAR_EMOJI = "draft_avatar_emoji"
         const val EXTRA_DRAFT_QR_VALUE = "draft_qr_value"
         const val EXTRA_DRAFT_PASS_COLOR = "draft_pass_color"
     }
@@ -392,17 +396,12 @@ fun VisitasApp(
                                 AppTab.CREATE -> CreateScreen(
                                     padding = padding,
                                     draft = uiState.draft,
-                                    canUseGoogleWallet = uiState.canUseGoogleWallet,
-                                    walletIssuerId = uiState.walletIssuerId,
-                                    walletClassSuffix = uiState.walletClassSuffix,
-                                    walletBackendUrl = uiState.walletBackendUrl,
                                     t = t,
                                     onPickPhoto = onPickPhoto,
                                     onPickQrCode = onPickQrCode,
                                     onScanQrFromBitmap = viewModel::scanQrFromBitmap,
                                     onImportVCard = viewModel::importVCardFromUri,
                                     onDraftChange = viewModel::updateDraft,
-                                    onWalletSettingsChange = viewModel::updateWalletSettings,
                                     onCreatePass = {
                                         scope.launch {
                                              val draft = uiState.draft
@@ -475,7 +474,6 @@ fun VisitasApp(
                                               }
                                           }
                                       },
-                                    onPersistWalletSettings = viewModel::persistWalletSettings,
                                     onClearDraft = viewModel::clearDraft,
                                     onClearQr = viewModel::clearDraftQr,
                                     onOpenDraftDetails = {
@@ -491,6 +489,7 @@ fun VisitasApp(
                                             .putExtra(PassDetailsActivity.EXTRA_DRAFT_WEBSITE, draft.website)
                                             .putExtra(PassDetailsActivity.EXTRA_DRAFT_NOTE, draft.note)
                                             .putExtra(PassDetailsActivity.EXTRA_DRAFT_PHOTO_URI, draft.photoUri)
+                                            .putExtra(PassDetailsActivity.EXTRA_DRAFT_AVATAR_EMOJI, draft.avatarEmoji)
                                             .putExtra(PassDetailsActivity.EXTRA_DRAFT_QR_VALUE, draft.qrValue)
                                             .putExtra(PassDetailsActivity.EXTRA_DRAFT_PASS_COLOR, draft.passColor)
                                         context.startActivity(intent)
@@ -544,6 +543,7 @@ fun VisitasApp(
                             PassDetailsScreen(
                                 accentColor = parseColor(detailsCard.passColor),
                                 photoUri = detailsCard.photoUri,
+                                avatarEmoji = detailsCard.avatarEmoji,
                                 badgeText = t("pass"),
                                 title = detailsCard.name.ifBlank { "Sem nome" },
                                 subtitle = detailsCard.role.ifBlank { "" },
@@ -565,6 +565,7 @@ fun VisitasApp(
                         PassDetailsScreen(
                             accentColor = parseColor(uiState.draft.passColor),
                             photoUri = uiState.draft.photoUri,
+                            avatarEmoji = uiState.draft.avatarEmoji,
                             badgeText = t("pass"),
                             title = uiState.draft.name.ifBlank { "Seu nome" },
                             subtitle = uiState.draft.role.ifBlank { "Cargo ou descrição" },
@@ -724,19 +725,13 @@ private fun ListHeader(title: String, subtitle: String, message: String) {
 private fun CreateScreen(
     padding: PaddingValues,
     draft: CardDraft,
-    canUseGoogleWallet: Boolean,
-    walletIssuerId: String,
-    walletClassSuffix: String,
-    walletBackendUrl: String,
     t: (String) -> String,
     onPickPhoto: () -> Unit,
     onPickQrCode: () -> Unit,
     onScanQrFromBitmap: (Bitmap) -> Unit,
     onImportVCard: (Uri) -> Unit,
     onDraftChange: ((CardDraft) -> CardDraft) -> Unit,
-    onWalletSettingsChange: (String?, String?, String?) -> Unit,
     onCreatePass: () -> Unit,
-    onPersistWalletSettings: () -> Unit,
     onClearDraft: () -> Unit,
     onClearQr: () -> Unit,
     onOpenDraftDetails: () -> Unit
@@ -751,19 +746,13 @@ private fun CreateScreen(
             item {
                 CreateInvitesEditorCard(
                     draft = draft,
-                    canUseGoogleWallet = canUseGoogleWallet,
-                    walletIssuerId = walletIssuerId,
-                    walletClassSuffix = walletClassSuffix,
-                    walletBackendUrl = walletBackendUrl,
                     t = t,
                     onPickPhoto = onPickPhoto,
                     onPickQrCode = onPickQrCode,
                     onScanQrFromBitmap = onScanQrFromBitmap,
                     onImportVCard = onImportVCard,
                     onDraftChange = onDraftChange,
-                    onWalletSettingsChange = onWalletSettingsChange,
                     onCreatePass = onCreatePass,
-                    onPersistWalletSettings = onPersistWalletSettings,
                     onClearDraft = onClearDraft,
                     onClearQr = onClearQr,
                     onOpenDraftDetails = onOpenDraftDetails
@@ -776,19 +765,13 @@ private fun CreateScreen(
 @Composable
 private fun CreateInvitesEditorCard(
     draft: CardDraft,
-    canUseGoogleWallet: Boolean,
-    walletIssuerId: String,
-    walletClassSuffix: String,
-    walletBackendUrl: String,
     t: (String) -> String,
     onPickPhoto: () -> Unit,
     onPickQrCode: () -> Unit,
     onScanQrFromBitmap: (Bitmap) -> Unit,
     onImportVCard: (Uri) -> Unit,
     onDraftChange: ((CardDraft) -> CardDraft) -> Unit,
-    onWalletSettingsChange: (String?, String?, String?) -> Unit,
     onCreatePass: () -> Unit,
-    onPersistWalletSettings: () -> Unit,
     onClearDraft: () -> Unit,
     onClearQr: () -> Unit,
     onOpenDraftDetails: () -> Unit
@@ -890,6 +873,7 @@ private fun CreateInvitesEditorCard(
                 Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), color = Color.Black.copy(alpha = 0.22f)) {
                     Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         FrostedField(draft.name, t("name")) { onDraftChange { d -> d.copy(name = it) } }
+                        FrostedField(draft.avatarEmoji, t("emoji")) { onDraftChange { d -> d.copy(avatarEmoji = it) } }
                         FrostedField(draft.role, t("role")) { onDraftChange { d -> d.copy(role = it) } }
                         FrostedField(draft.phone, t("phone")) { onDraftChange { d -> d.copy(phone = it) } }
                         FrostedField(draft.email, t("email")) { onDraftChange { d -> d.copy(email = it) } }
@@ -897,7 +881,6 @@ private fun CreateInvitesEditorCard(
                         FrostedField(draft.linkedin, t("linkedin")) { onDraftChange { d -> d.copy(linkedin = it) } }
                         FrostedField(draft.website, t("url")) { onDraftChange { d -> d.copy(website = it) } }
                         FrostedField(draft.note, t("note"), singleLine = false) { onDraftChange { d -> d.copy(note = it) } }
-                        FrostedField(draft.walletPhotoUrl, t("wallet_photo"), singleLine = false) { onDraftChange { d -> d.copy(walletPhotoUrl = it) } }
                     }
                 }
 
@@ -929,8 +912,6 @@ private fun CreateInvitesEditorCard(
                         ColorPicker(draft.passColor) { color -> onDraftChange { d -> d.copy(passColor = color) } }
                     }
                 }
-
-                WalletCard(canUseGoogleWallet, walletIssuerId, walletClassSuffix, walletBackendUrl, t, onWalletSettingsChange, onPersistWalletSettings)
 
                 Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), color = Color.Black.copy(alpha = 0.22f)) {
                     Row(Modifier.fillMaxWidth().padding(14.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -1598,6 +1579,7 @@ private fun DraftPreview(draft: CardDraft, passLabel: String, t: (String) -> Str
     ExpandablePassCard(
         accentColor = c,
         photoUri = draft.photoUri,
+        avatarEmoji = draft.avatarEmoji,
         badgeText = passLabel,
         title = draft.name.ifBlank { "Seu nome" },
         subtitle = draft.role.ifBlank { "Cargo ou descrição" },
@@ -1701,7 +1683,7 @@ private fun SavedPassCard(card: VisitingCard, t: (String) -> String, showDelete:
                 }
 
                 Spacer(Modifier.height(10.dp))
-                PhotoBubble(card.photoUri, accentColor, Modifier.size(48.dp))
+                PhotoBubble(card.photoUri, accentColor, Modifier.size(48.dp), avatarEmoji = card.avatarEmoji)
                 Text(
                     card.name.ifBlank { "Sem nome" },
                     color = Color.White,
@@ -1837,6 +1819,7 @@ private fun SavedPassCard(card: VisitingCard, t: (String) -> String, showDelete:
 private fun PassDetailsScreen(
     accentColor: Color,
     photoUri: String,
+    avatarEmoji: String,
     badgeText: String,
     title: String,
     subtitle: String,
@@ -1917,6 +1900,7 @@ private fun PassDetailsScreen(
                             PassExpandedCard(
                                 accentColor = accentColor,
                                 photoUri = photoUri,
+                                avatarEmoji = avatarEmoji,
                                 badgeText = badgeText,
                                 title = title,
                                 subtitle = subtitle,
@@ -1937,6 +1921,7 @@ private fun PassDetailsScreen(
 private fun PassExpandedCard(
     accentColor: Color,
     photoUri: String,
+    avatarEmoji: String,
     badgeText: String,
     title: String,
     subtitle: String,
@@ -1948,6 +1933,7 @@ private fun PassExpandedCard(
     PassTicketGlass(
         accentColor = accentColor,
         photoUri = photoUri,
+        avatarEmoji = avatarEmoji,
         badgeText = badgeText,
         title = title,
         subtitle = subtitle,
@@ -1962,6 +1948,7 @@ private fun PassExpandedCard(
 private fun PassTicketGlass(
     accentColor: Color,
     photoUri: String,
+    avatarEmoji: String,
     badgeText: String,
     title: String,
     subtitle: String,
@@ -2042,7 +2029,7 @@ private fun PassTicketGlass(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                PhotoBubble(photoUri, accentColor, Modifier.size(52.dp))
+                PhotoBubble(photoUri, accentColor, Modifier.size(52.dp), avatarEmoji = avatarEmoji)
                 Column(Modifier.weight(1f)) {
                     Text(
                         title,
@@ -2269,6 +2256,7 @@ private fun wrap01(value: Float): Float {
 private fun ExpandablePassCard(
     accentColor: Color,
     photoUri: String,
+    avatarEmoji: String,
     badgeText: String,
     title: String,
     subtitle: String,
@@ -2309,6 +2297,7 @@ private fun ExpandablePassCard(
                         PassTicket(
                             accentColor = accentColor,
                             photoUri = photoUri,
+                            avatarEmoji = avatarEmoji,
                             badgeText = badgeText,
                             title = title,
                             subtitle = subtitle,
@@ -2321,6 +2310,7 @@ private fun ExpandablePassCard(
                         PassCompact(
                             accentColor = accentColor,
                             photoUri = photoUri,
+                            avatarEmoji = avatarEmoji,
                             badgeText = badgeText,
                             title = title,
                             subtitle = subtitle,
@@ -2350,6 +2340,7 @@ private fun ExpandablePassCard(
 private fun PassCompact(
     accentColor: Color,
     photoUri: String,
+    avatarEmoji: String,
     badgeText: String,
     title: String,
     subtitle: String,
@@ -2360,7 +2351,7 @@ private fun PassCompact(
 ) {
     Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
-            PhotoBubble(photoUri, accentColor, Modifier.size(64.dp))
+            PhotoBubble(photoUri, accentColor, Modifier.size(64.dp), avatarEmoji = avatarEmoji)
             Column(Modifier.weight(1f)) {
                 Text(title, style = MaterialTheme.typography.titleLarge)
                 Text(subtitle)
@@ -2385,6 +2376,7 @@ private fun PassCompact(
 private fun PassTicket(
     accentColor: Color,
     photoUri: String,
+    avatarEmoji: String,
     badgeText: String,
     title: String,
     subtitle: String,
@@ -2397,7 +2389,7 @@ private fun PassTicket(
         Surface(shape = RoundedCornerShape(26.dp), color = Color.White) {
             Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    PhotoBubble(photoUri, accentColor, Modifier.size(52.dp))
+                    PhotoBubble(photoUri, accentColor, Modifier.size(52.dp), avatarEmoji = avatarEmoji)
                     Column(Modifier.weight(1f)) {
                         Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
                         Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -2459,10 +2451,24 @@ private fun TicketQr(value: String, label: String) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { palette.forEach { hex -> FilterChip(selected = selectedColor.equals(hex, true), onClick = { onSelectColor(hex) }, label = { Text(" ") }, leadingIcon = { Box(Modifier.size(24.dp).clip(CircleShape).background(parseColor(hex)).border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)) }) } }
 }
 
-@Composable private fun PhotoBubble(photoUri: String, fallbackColor: Color, modifier: Modifier = Modifier) {
+@Composable private fun PhotoBubble(photoUri: String, fallbackColor: Color, modifier: Modifier = Modifier, avatarEmoji: String = "") {
     Box(modifier.clip(RoundedCornerShape(24.dp)).background(fallbackColor.copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {
-        if (photoUri.isNotBlank()) AndroidView(factory = { context -> ImageView(context).apply { scaleType = ImageView.ScaleType.CENTER_CROP; clipToOutline = true } }, modifier = Modifier.fillMaxSize(), update = { it.setImageURI(Uri.parse(photoUri)) })
-        else Icon(Icons.Rounded.Person, null, tint = fallbackColor, modifier = Modifier.size(34.dp))
+        if (photoUri.isNotBlank()) {
+            AndroidView(
+                factory = { context ->
+                    ImageView(context).apply {
+                        scaleType = ImageView.ScaleType.CENTER_CROP
+                        clipToOutline = true
+                    }
+                },
+                modifier = Modifier.fillMaxSize(),
+                update = { it.setImageURI(Uri.parse(photoUri)) }
+            )
+        } else if (avatarEmoji.isNotBlank()) {
+            Text(avatarEmoji.trim(), style = MaterialTheme.typography.headlineSmall, color = Color.White)
+        } else {
+            Icon(Icons.Rounded.Person, null, tint = fallbackColor, modifier = Modifier.size(34.dp))
+        }
     }
 }
 
@@ -2544,10 +2550,10 @@ private fun showToast(context: android.content.Context, message: String) {
 }
 
 private fun tr(language: AppLanguage, key: String): String {
-    val pt = mapOf("home" to "Home", "create" to "Criar", "saved" to "Salvos", "settings" to "Config.", "home_head" to "Recentes", "home_sub" to "", "home_empty_title" to "Sem cartões recentes", "home_empty_body" to "Crie um passe para vê-lo aqui.", "create_head" to "Criar cartão", "create_sub" to "Abra o campo criar e monte o passe.", "create_hint" to "Personalize apenas a cor do passe.", "saved_head" to "Todos os cartões salvos", "saved_sub" to "Aqui ficam todos os cartões guardados.", "saved_count" to "cartões salvos", "saved_empty_title" to "Sem cartões salvos", "saved_empty_body" to "Os cartões criados aparecem aqui.", "settings_head" to "Configurações", "settings_sub" to "Idioma, segurança, notificações e backup.", "version" to "Versão", "github" to "Minha conta do GitHub", "language" to "Idioma do app", "contacts" to "Contatos", "terms" to "Termo", "open_create" to "Abrir criar", "edit" to "Editar", "delete" to "Excluir", "pass" to "Passe", "add_photo" to "Adicionar foto", "change_photo" to "Trocar foto", "photo_hint" to "A foto fica salva no app. Para aparecer no Google Wallet, use uma URL pública.", "name" to "Nome", "role" to "Cargo", "phone" to "Celular", "email" to "Email", "instagram" to "Instagram", "linkedin" to "LinkedIn", "url" to "URL", "note" to "Nota", "qr_code" to "QR code", "wallet_photo" to "URL pública da foto para o Wallet", "pass_color" to "Cor do passe", "create_pass" to "Criar passe", "clear" to "Limpar", "wallet" to "Google Wallet", "wallet_on" to "Google Wallet disponível neste aparelho.", "wallet_off" to "Google Wallet indisponível ou não elegível neste aparelho.", "backend" to "URL do backend JWT", "wallet_save" to "Salvar configuração do Wallet", "wallet_add" to "Salvar no Wallet")
+    val pt = mapOf("home" to "Home", "create" to "Criar", "saved" to "Salvos", "settings" to "Config.", "home_head" to "Recentes", "home_sub" to "", "home_empty_title" to "Sem cartões recentes", "home_empty_body" to "Crie um passe para vê-lo aqui.", "create_head" to "Criar cartão", "create_sub" to "Abra o campo criar e monte o passe.", "create_hint" to "Personalize apenas a cor do passe.", "saved_head" to "Todos os cartões salvos", "saved_sub" to "Aqui ficam todos os cartões guardados.", "saved_count" to "cartões salvos", "saved_empty_title" to "Sem cartões salvos", "saved_empty_body" to "Os cartões criados aparecem aqui.", "settings_head" to "Configurações", "settings_sub" to "Idioma, segurança, notificações e backup.", "version" to "Versão", "github" to "Minha conta do GitHub", "language" to "Idioma do app", "contacts" to "Contatos", "terms" to "Termo", "open_create" to "Abrir criar", "edit" to "Editar", "delete" to "Excluir", "pass" to "Passe", "add_photo" to "Adicionar foto", "change_photo" to "Trocar foto", "photo_hint" to "A foto fica salva no app. Para aparecer no Google Wallet, use uma URL pública.", "name" to "Nome", "emoji" to "Emoji", "role" to "Cargo", "phone" to "Celular", "email" to "Email", "instagram" to "Instagram", "linkedin" to "LinkedIn", "url" to "URL", "note" to "Nota", "qr_code" to "QR code", "wallet_photo" to "URL pública da foto para o Wallet", "pass_color" to "Cor do passe", "create_pass" to "Criar passe", "clear" to "Limpar", "wallet" to "Google Wallet", "wallet_on" to "Google Wallet disponível neste aparelho.", "wallet_off" to "Google Wallet indisponível ou não elegível neste aparelho.", "backend" to "URL do backend JWT", "wallet_save" to "Salvar configuração do Wallet", "wallet_add" to "Salvar no Wallet")
     val pt2 = pt + mapOf("qr_pick" to "Selecionar imagem de QR Code", "qr_change" to "Trocar QR", "qr_remove" to "Remover QR", "qr_scan" to "Escanear QR", "vcf_import" to "Importar vCard (.vcf)", "backup" to "Backup", "backup_export" to "Exportar", "backup_import" to "Importar", "share" to "Compartilhar", "share_image" to "Imagem (PNG)", "share_pdf" to "PDF", "share_vcard" to "vCard (.vcf)", "share_contacts" to "Salvar nos contatos", "presentation_mode" to "Modo apresentação", "presentation_started" to "Modo apresentação ativado.", "live_updates_denied" to "Permita Live Updates para aparecer na Now Bar.", "premium_ui_open" to "Abrir UI Premium", "premium_ui_hint" to "Nova interface com estilo premium (Apple + Material You).")
-    val en = mapOf("home" to "Home", "create" to "Create", "saved" to "Saved", "settings" to "Settings", "home_head" to "Recents", "home_sub" to "", "home_empty_title" to "No recent cards", "home_empty_body" to "Create a pass to see it here.", "create_head" to "Create card", "create_sub" to "Open the create area and build the pass.", "create_hint" to "Only customize the pass color.", "saved_head" to "All saved cards", "saved_sub" to "Every saved card appears here.", "saved_count" to "saved cards", "saved_empty_title" to "No saved cards", "saved_empty_body" to "Created cards appear here.", "settings_head" to "Settings", "settings_sub" to "Language, security, notifications and backup.", "version" to "Version", "github" to "My GitHub account", "language" to "App language", "contacts" to "Contacts", "terms" to "Terms", "open_create" to "Open create", "edit" to "Edit", "delete" to "Delete", "pass" to "Pass", "add_photo" to "Add photo", "change_photo" to "Change photo", "photo_hint" to "The photo is saved in the app. To show in Google Wallet, use a public image URL.", "name" to "Name", "role" to "Role", "phone" to "Phone", "email" to "Email", "instagram" to "Instagram", "linkedin" to "LinkedIn", "url" to "URL", "note" to "Note", "qr_code" to "QR code", "wallet_photo" to "Public photo URL for Wallet", "pass_color" to "Pass color", "create_pass" to "Create pass", "clear" to "Clear", "wallet" to "Google Wallet", "wallet_on" to "Google Wallet is available on this device.", "wallet_off" to "Google Wallet is unavailable or not eligible on this device.", "backend" to "JWT backend URL", "wallet_save" to "Save Wallet settings", "wallet_add" to "Save to Wallet", "qr_pick" to "Select QR Code image", "qr_change" to "Change QR", "qr_remove" to "Remove QR")
+    val en = mapOf("home" to "Home", "create" to "Create", "saved" to "Saved", "settings" to "Settings", "home_head" to "Recents", "home_sub" to "", "home_empty_title" to "No recent cards", "home_empty_body" to "Create a pass to see it here.", "create_head" to "Create card", "create_sub" to "Open the create area and build the pass.", "create_hint" to "Only customize the pass color.", "saved_head" to "All saved cards", "saved_sub" to "Every saved card appears here.", "saved_count" to "saved cards", "saved_empty_title" to "No saved cards", "saved_empty_body" to "Created cards appear here.", "settings_head" to "Settings", "settings_sub" to "Language, security, notifications and backup.", "version" to "Version", "github" to "My GitHub account", "language" to "App language", "contacts" to "Contacts", "terms" to "Terms", "open_create" to "Open create", "edit" to "Edit", "delete" to "Delete", "pass" to "Pass", "add_photo" to "Add photo", "change_photo" to "Change photo", "photo_hint" to "The photo is saved in the app. To show in Google Wallet, use a public image URL.", "name" to "Name", "emoji" to "Emoji", "role" to "Role", "phone" to "Phone", "email" to "Email", "instagram" to "Instagram", "linkedin" to "LinkedIn", "url" to "URL", "note" to "Note", "qr_code" to "QR code", "wallet_photo" to "Public photo URL for Wallet", "pass_color" to "Pass color", "create_pass" to "Create pass", "clear" to "Clear", "wallet" to "Google Wallet", "wallet_on" to "Google Wallet is available on this device.", "wallet_off" to "Google Wallet is unavailable or not eligible on this device.", "backend" to "JWT backend URL", "wallet_save" to "Save Wallet settings", "wallet_add" to "Save to Wallet", "qr_pick" to "Select QR Code image", "qr_change" to "Change QR", "qr_remove" to "Remove QR")
     val en2 = en + mapOf("qr_scan" to "Scan QR", "vcf_import" to "Import vCard (.vcf)", "backup" to "Backup", "backup_export" to "Export", "backup_import" to "Import", "share" to "Share", "share_image" to "Image (PNG)", "share_pdf" to "PDF", "share_vcard" to "vCard (.vcf)", "share_contacts" to "Save to contacts", "presentation_mode" to "Presentation mode", "presentation_started" to "Presentation mode enabled.", "live_updates_denied" to "Allow Live Updates to appear in the Now Bar.", "premium_ui_open" to "Open Premium UI", "premium_ui_hint" to "New premium interface (Apple + Material You).")
-    val zh = mapOf("home" to "首页", "create" to "创建", "saved" to "已保存", "settings" to "设置", "home_head" to "最近", "home_sub" to "", "home_empty_title" to "没有最近卡片", "home_empty_body" to "创建通行证后会显示在这里。", "create_head" to "创建卡片", "create_sub" to "打开创建区域并制作通行证。", "create_hint" to "只允许自定义通行证颜色。", "saved_head" to "所有已保存卡片", "saved_sub" to "所有保存的卡片都在这里。", "saved_count" to "张已保存卡片", "saved_empty_title" to "没有已保存卡片", "saved_empty_body" to "已创建的卡片会显示在这里。", "settings_head" to "设置", "settings_sub" to "语言、安全、通知和备份。", "version" to "版本", "github" to "我的 GitHub 账号", "language" to "应用语言", "contacts" to "联系方式", "terms" to "条款", "open_create" to "打开创建", "edit" to "编辑", "delete" to "删除", "pass" to "通行证", "add_photo" to "添加照片", "change_photo" to "更换照片", "photo_hint" to "照片会保存在应用中。若要显示在 Google Wallet 中，请使用公开图片链接。", "name" to "姓名", "role" to "职位", "phone" to "手机", "email" to "邮箱", "instagram" to "Instagram", "linkedin" to "LinkedIn", "url" to "链接", "note" to "备注", "qr_code" to "二维码", "wallet_photo" to "Wallet 公开照片链接", "pass_color" to "通行证颜色", "create_pass" to "创建通行证", "clear" to "清空", "wallet" to "Google Wallet", "wallet_on" to "此设备支持 Google Wallet。", "wallet_off" to "此设备不支持 Google Wallet。", "backend" to "JWT 后端地址", "wallet_save" to "保存 Wallet 设置", "wallet_add" to "保存到 Wallet", "qr_pick" to "选择二维码图片", "qr_change" to "更换二维码", "qr_remove" to "移除二维码", "qr_scan" to "扫描二维码", "vcf_import" to "导入 vCard (.vcf)", "backup" to "备份", "backup_export" to "导出", "backup_import" to "导入", "share" to "分享", "share_image" to "图片 (PNG)", "share_pdf" to "PDF", "share_vcard" to "vCard (.vcf)", "share_contacts" to "保存到联系人", "presentation_mode" to "演示模式", "presentation_started" to "演示模式已启用。", "live_updates_denied" to "允许实时更新以在 Now Bar 中显示。", "premium_ui_open" to "打开高级界面", "premium_ui_hint" to "新界面（Apple + Material You）。")
+    val zh = mapOf("home" to "首页", "create" to "创建", "saved" to "已保存", "settings" to "设置", "home_head" to "最近", "home_sub" to "", "home_empty_title" to "没有最近卡片", "home_empty_body" to "创建通行证后会显示在这里。", "create_head" to "创建卡片", "create_sub" to "打开创建区域并制作通行证。", "create_hint" to "只允许自定义通行证颜色。", "saved_head" to "所有已保存卡片", "saved_sub" to "所有保存的卡片都在这里。", "saved_count" to "张已保存卡片", "saved_empty_title" to "没有已保存卡片", "saved_empty_body" to "已创建的卡片会显示在这里。", "settings_head" to "设置", "settings_sub" to "语言、安全、通知和备份。", "version" to "版本", "github" to "我的 GitHub 账号", "language" to "应用语言", "contacts" to "联系方式", "terms" to "条款", "open_create" to "打开创建", "edit" to "编辑", "delete" to "删除", "pass" to "通行证", "add_photo" to "添加照片", "change_photo" to "更换照片", "photo_hint" to "照片会保存在应用中。若要显示在 Google Wallet 中，请使用公开图片链接。", "name" to "姓名", "emoji" to "Emoji", "role" to "职位", "phone" to "手机", "email" to "邮箱", "instagram" to "Instagram", "linkedin" to "LinkedIn", "url" to "链接", "note" to "备注", "qr_code" to "二维码", "wallet_photo" to "Wallet 公开照片链接", "pass_color" to "通行证颜色", "create_pass" to "创建通行证", "clear" to "清空", "wallet" to "Google Wallet", "wallet_on" to "此设备支持 Google Wallet。", "wallet_off" to "此设备不支持 Google Wallet。", "backend" to "JWT 后端地址", "wallet_save" to "保存 Wallet 设置", "wallet_add" to "保存到 Wallet", "qr_pick" to "选择二维码图片", "qr_change" to "更换二维码", "qr_remove" to "移除二维码", "qr_scan" to "扫描二维码", "vcf_import" to "导入 vCard (.vcf)", "backup" to "备份", "backup_export" to "导出", "backup_import" to "导入", "share" to "分享", "share_image" to "图片 (PNG)", "share_pdf" to "PDF", "share_vcard" to "vCard (.vcf)", "share_contacts" to "保存到联系人", "presentation_mode" to "演示模式", "presentation_started" to "演示模式已启用。", "live_updates_denied" to "允许实时更新以在 Now Bar 中显示。", "premium_ui_open" to "打开高级界面", "premium_ui_hint" to "新界面（Apple + Material You）。")
     return when (language) { AppLanguage.EN -> en2[key] ?: key; AppLanguage.ZH -> zh[key] ?: key; else -> pt2[key] ?: key }
 }

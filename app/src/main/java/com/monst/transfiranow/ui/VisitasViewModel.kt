@@ -16,8 +16,8 @@ import com.monst.transfiranow.data.VisitingCard
 import com.monst.transfiranow.share.CardsBackup
 import com.monst.transfiranow.util.VCardParser
 import com.monst.transfiranow.widget.MyCardWidgetProvider
-import com.monst.transfiranow.wallet.WalletJwtClient
-import com.monst.transfiranow.wallet.WalletPassBuilder
+import com.monst.transfiranow.BuildConfig
+import com.monst.transfiranow.wallet.WalletSaveUrlClient
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.BinaryBitmap
 import com.google.zxing.MultiFormatReader
@@ -32,11 +32,12 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
+import org.json.JSONObject
 import java.util.UUID
 
 class VisitasViewModel(application: Application) : AndroidViewModel(application) {
     private val store = CardStore(application)
-    private val walletJwtClient = WalletJwtClient()
+    private val walletSaveUrlClient = WalletSaveUrlClient()
     private val _uiState = MutableStateFlow(CardsUiState())
     val uiState: StateFlow<CardsUiState> = _uiState.asStateFlow()
 
@@ -89,6 +90,7 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
                     website = card.website,
                     note = card.note,
                     photoUri = card.photoUri,
+                    avatarEmoji = card.avatarEmoji,
                     walletPhotoUrl = card.walletPhotoUrl,
                     qrValue = card.qrValue,
                     passColor = card.passColor
@@ -366,38 +368,43 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun prepareWalletJwt(card: VisitingCard, onReady: (String) -> Unit) {
+    fun prepareWalletSaveUrl(card: VisitingCard, onReady: (String) -> Unit) {
         val state = _uiState.value
-        if (state.walletIssuerId.isBlank() || state.walletBackendUrl.isBlank()) {
-            _uiState.update {
-                it.copy(statusMessage = message(it.appLanguage, "wallet_missing"))
-            }
-            return
-        }
+        val backendEndpoint = normalizeWalletBackendEndpoint(
+            state.walletBackendUrl.ifBlank { BuildConfig.CARDS_API_BASE_URL }
+        )
 
         viewModelScope.launch {
-            val issuerId = state.walletIssuerId.trim()
-            val backendEndpoint = normalizeWalletBackendEndpoint(state.walletBackendUrl)
             _uiState.update {
                 it.copy(
                     isSavingToWallet = true,
                     statusMessage = message(it.appLanguage, "wallet_generating")
                 )
             }
-            val payload = WalletPassBuilder.buildUnsignedPayload(
-                issuerId = issuerId,
-                classSuffix = state.walletClassSuffix.ifBlank { "visitas_card" },
-                card = card
-            )
-            val result = walletJwtClient.fetchSignedJwt(backendEndpoint, payload)
-            result.onSuccess { jwt ->
+
+            val payload = JSONObject()
+                .put("cardId", card.id)
+                .put("name", card.name)
+                .put("role", card.role)
+                .put("phone", card.phone)
+                .put("email", card.email)
+                .put("instagram", card.instagram)
+                .put("linkedin", card.linkedin)
+                .put("website", card.website)
+                .put("note", card.note)
+                .put("passColor", card.passColor)
+                .put("qrValue", card.qrValue)
+                .put("walletPhotoUrl", card.walletPhotoUrl)
+
+            val result = walletSaveUrlClient.fetchSaveUrl(backendEndpoint, payload)
+            result.onSuccess { url ->
                 _uiState.update {
                     it.copy(
                         isSavingToWallet = false,
                         statusMessage = message(it.appLanguage, "wallet_opening")
                     )
                 }
-                onReady(jwt)
+                onReady(url)
             }.onFailure { error ->
                 _uiState.update {
                     it.copy(
@@ -412,8 +419,8 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
     private fun normalizeWalletBackendEndpoint(raw: String): String {
         val trimmed = raw.trim().removeSuffix("/")
         if (trimmed.isBlank()) return trimmed
-        if (trimmed.contains("/wallet/sign")) return trimmed
-        return if (trimmed.matches(Regex("^https?://[^/]+$"))) "$trimmed/wallet/sign" else trimmed
+        if (trimmed.contains("/wallet/save-url")) return trimmed
+        return if (trimmed.matches(Regex("^https?://[^/]+$"))) "$trimmed/wallet/save-url" else trimmed
     }
 
     fun onWalletSaveResult(message: String) {
@@ -434,10 +441,10 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
                 "pass_saved" -> "Passe salvo no app."
                 "pass_deleted" -> "Passe removido."
                 "wallet_saved" -> "Configuração do Google Wallet salva."
-                "wallet_missing" -> "Configure o issuer ID e a URL do backend que assina o JWT do Google Wallet."
-                "wallet_generating" -> "Gerando passe para o Google Wallet..."
-                "wallet_opening" -> "JWT assinado recebido. Abrindo Google Wallet..."
-                else -> "Falha ao criar o JWT do Google Wallet."
+                "wallet_missing" -> "Configure o backend do Google Wallet para gerar o link."
+                "wallet_generating" -> "Gerando link do Google Wallet..."
+                "wallet_opening" -> "Link gerado. Abrindo Google Wallet..."
+                else -> "Falha ao gerar o link do Google Wallet."
             }
             AppLanguage.PT_PT, AppLanguage.PT_AO -> when (key) {
                 "create_intro" -> "Crie um passe, guarde na aplicação e depois envie para o Google Wallet."
@@ -451,10 +458,10 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
                 "pass_saved" -> "Passe guardado na aplicação."
                 "pass_deleted" -> "Passe removido."
                 "wallet_saved" -> "Configuração do Google Wallet guardada."
-                "wallet_missing" -> "Configure o issuer ID e o URL do backend que assina o JWT do Google Wallet."
-                "wallet_generating" -> "A gerar passe para o Google Wallet..."
-                "wallet_opening" -> "JWT assinado recebido. A abrir o Google Wallet..."
-                else -> "Falha ao criar o JWT do Google Wallet."
+                "wallet_missing" -> "Configure o backend do Google Wallet para gerar o link."
+                "wallet_generating" -> "A gerar link do Google Wallet..."
+                "wallet_opening" -> "Link gerado. A abrir o Google Wallet..."
+                else -> "Falha ao gerar o link do Google Wallet."
             }
             AppLanguage.EN -> when (key) {
                 "create_intro" -> "Create a pass, save it in the app, then send it to Google Wallet."
@@ -468,10 +475,10 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
                 "pass_saved" -> "Pass saved in the app."
                 "pass_deleted" -> "Pass removed."
                 "wallet_saved" -> "Google Wallet settings saved."
-                "wallet_missing" -> "Set the issuer ID and backend URL that signs the Google Wallet JWT."
-                "wallet_generating" -> "Generating pass for Google Wallet..."
-                "wallet_opening" -> "Signed JWT received. Opening Google Wallet..."
-                else -> "Failed to create the Google Wallet JWT."
+                "wallet_missing" -> "Set up the backend to generate the Google Wallet link."
+                "wallet_generating" -> "Generating Google Wallet link..."
+                "wallet_opening" -> "Link received. Opening Google Wallet..."
+                else -> "Failed to generate the Google Wallet link."
             }
             AppLanguage.ZH -> when (key) {
                 "create_intro" -> "创建通行证，保存到应用中，然后发送到 Google Wallet。"
@@ -485,10 +492,10 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
                 "pass_saved" -> "通行证已保存在应用中。"
                 "pass_deleted" -> "通行证已删除。"
                 "wallet_saved" -> "Google Wallet 设置已保存。"
-                "wallet_missing" -> "请配置 issuer ID 和用于签名 Google Wallet JWT 的后端地址。"
-                "wallet_generating" -> "正在为 Google Wallet 生成通行证..."
-                "wallet_opening" -> "已收到签名 JWT，正在打开 Google Wallet..."
-                else -> "创建 Google Wallet JWT 失败。"
+                "wallet_missing" -> "请配置后端以生成 Google Wallet 链接。"
+                "wallet_generating" -> "正在生成 Google Wallet 链接..."
+                "wallet_opening" -> "已收到链接，正在打开 Google Wallet..."
+                else -> "生成 Google Wallet 链接失败。"
             }
         }
     }

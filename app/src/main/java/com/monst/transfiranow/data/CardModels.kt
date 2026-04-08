@@ -26,6 +26,7 @@ data class VisitingCard(
     val website: String,
     val note: String,
     val photoUri: String,
+    val avatarEmoji: String,
     val walletPhotoUrl: String,
     val qrValue: String,
     val passColor: String,
@@ -43,6 +44,7 @@ data class CardDraft(
     val website: String = "",
     val note: String = "",
     val photoUri: String = "",
+    val avatarEmoji: String = "",
     val walletPhotoUrl: String = "",
     val qrValue: String = "",
     val passColor: String = "#1E3A8A"

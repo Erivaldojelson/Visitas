@@ -194,16 +194,18 @@ object CardExport {
             canvas.drawBitmap(src, null, dst, Paint(Paint.ANTI_ALIAS_FLAG))
             canvas.restoreToCount(checkpoint)
         } ?: run {
+            val emoji = card.avatarEmoji.trim()
             val initial = card.name.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "V"
+            val text = emoji.ifBlank { initial }
             val initialPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.WHITE
-                textSize = 92f
-                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                textSize = if (emoji.isNotBlank()) 110f else 92f
+                typeface = Typeface.create(Typeface.DEFAULT, if (emoji.isNotBlank()) Typeface.NORMAL else Typeface.BOLD)
                 textAlign = Paint.Align.CENTER
             }
             val x = avatarRect.centerX()
             val y = avatarRect.centerY() - (initialPaint.descent() + initialPaint.ascent()) / 2
-            canvas.drawText(initial, x, y, initialPaint)
+            canvas.drawText(text, x, y, initialPaint)
         }
 
         val titleLeft = avatarRect.right + 42f
