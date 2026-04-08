@@ -179,39 +179,50 @@ class EventModeService : Service() {
             builder.setSubText(phone)
         }
 
+        val role = card?.role?.trim().orEmpty()
+        val email = card?.email?.trim().orEmpty()
+        val website = card?.website?.trim().orEmpty()
+        val linkedin = card?.linkedin?.trim().orEmpty()
+        val instagram = card?.instagram?.trim().orEmpty()
+            .takeIf { it.isNotBlank() }
+            ?.let { if (it.startsWith("@")) it else "@$it" }
+            .orEmpty()
+
+        val summary = listOfNotNull(
+            role.takeIf { it.isNotBlank() },
+            phone.takeIf { it.isNotBlank() },
+            instagram.takeIf { it.isNotBlank() }
+        ).joinToString(" • ")
+
         if (qrBitmap != null) {
             val largeIcon = if (qrBitmap.width > 256) {
                 Bitmap.createScaledBitmap(qrBitmap, 256, 256, true)
             } else {
                 qrBitmap
             }
-
-            val instagram = card?.instagram?.trim().orEmpty()
-                .takeIf { it.isNotBlank() }
-                ?.let { if (it.startsWith("@")) it else "@$it" }
-
-            val summary = listOfNotNull(
-                card?.role?.trim()?.takeIf { it.isNotBlank() },
-                phone.takeIf { it.isNotBlank() },
-                instagram
-            ).joinToString(" • ")
-
             builder.setLargeIcon(largeIcon)
+        }
 
-            if (Build.VERSION.SDK_INT < 36) {
-                builder.setStyle(
-                    NotificationCompat.BigPictureStyle()
-                        .bigPicture(qrBitmap)
-                        .bigLargeIcon(null as Bitmap?)
-                        .setSummaryText(summary)
-                )
-            } else {
-                builder.setStyle(
-                    NotificationCompat.BigTextStyle()
-                        .bigText(text)
-                        .setSummaryText(summary)
-                )
+        if (card != null) {
+            val expandedLines = buildList {
+                role.takeIf { it.isNotBlank() }?.let { add("Cargo: $it") }
+                phone.takeIf { it.isNotBlank() }?.let { add("Telefone: $it") }
+                email.takeIf { it.isNotBlank() }?.let { add("Email: $it") }
+                instagram.takeIf { it.isNotBlank() }?.let { add("Instagram: $it") }
+                linkedin.takeIf { it.isNotBlank() }?.let { add("LinkedIn: $it") }
+                website.takeIf { it.isNotBlank() }?.let { add("URL: $it") }
             }
+            val style = NotificationCompat.InboxStyle()
+            style.setBigContentTitle(title)
+            expandedLines.take(6).forEach { line -> style.addLine(line) }
+            style.setSummaryText(summary.ifBlank { "Toque para compartilhar seu cartão" })
+            builder.setStyle(style)
+        } else if (summary.isNotBlank()) {
+            builder.setStyle(
+                NotificationCompat.BigTextStyle()
+                    .bigText(text)
+                    .setSummaryText(summary)
+            )
         }
 
         if (Build.VERSION.SDK_INT >= 36) {
