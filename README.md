@@ -80,4 +80,4 @@ O APK atual gerado para distribuicao manual fica em:
 
 ## Direitos autorais
 
-© 2026 Erivaldojelson. Todos os direitos reservados.
+© 2026 Erivaldo João. Todos os direitos reservados.
