@@ -156,7 +156,11 @@ class EventModeService : Service() {
             .setContentTitle(title)
             .setContentText(text)
             .setColor(pillColor)
-            .setColorized(true)
+            .apply {
+                if (Build.VERSION.SDK_INT < 36) {
+                    setColorized(true)
+                }
+            }
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setAutoCancel(false)
@@ -192,14 +196,22 @@ class EventModeService : Service() {
                 instagram
             ).joinToString(" • ")
 
-            builder
-                .setLargeIcon(largeIcon)
-                .setStyle(
+            builder.setLargeIcon(largeIcon)
+
+            if (Build.VERSION.SDK_INT < 36) {
+                builder.setStyle(
                     NotificationCompat.BigPictureStyle()
                         .bigPicture(qrBitmap)
                         .bigLargeIcon(null as Bitmap?)
                         .setSummaryText(summary)
                 )
+            } else {
+                builder.setStyle(
+                    NotificationCompat.BigTextStyle()
+                        .bigText(text)
+                        .setSummaryText(summary)
+                )
+            }
         }
 
         if (Build.VERSION.SDK_INT >= 36) {

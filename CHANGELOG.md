@@ -1,5 +1,9 @@
 # Changelog
 
+## Visitas 1.9.0-alpha.3 - 2026-04-08
+
+- Correção: Live Update/Now Bar volta a aparecer no Android 16+ (notificação promovida sem `colorized` e sem BigPicture no modo promovido).
+
 ## Visitas 1.9.0-alpha.2 - 2026-04-08
 
 - UI Premium → Recentes: adiciona atalho de Modo Evento para o cartão mais recente.

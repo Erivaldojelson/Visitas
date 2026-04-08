@@ -67,7 +67,14 @@ object AppNotifications {
             .setSmallIcon(R.drawable.ic_stat_download)
             .setContentTitle("Gerando cartão")
             .setContentText(cardName.ifBlank { "Aguarde…" })
-            .apply { pillColor?.let { setColor(it).setColorized(true) } }
+            .apply {
+                pillColor?.let {
+                    setColor(it)
+                    if (Build.VERSION.SDK_INT < 36 || !requestPromoted) {
+                        setColorized(true)
+                    }
+                }
+            }
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setAutoCancel(false)
