@@ -1,6 +1,6 @@
 # Changelog
 
-## Visitas 1.9.5 - 2026-04-08
+## Visitas 1.9.5 - 2026-04-09
 
 - Configurações reorganizadas em seções (estilo “Tomato”), deixando os atalhos mais claros.
 - Primeira abertura do app: tela de boas-vindas pedindo permissão de notificações (Android 13+) e configurando canais.
@@ -10,7 +10,8 @@
 - Configurações: novo menu “Aparência” (Claro/Escuro/Sistema, Cor dinâmica e Tema preto puro).
 - Removido “Adicionar ao Wallet do sistema” (incluindo widget e telas premium).
 - Logo/ícone atualizado para estilo 3D (fundo branco + emoji de pessoa).
-- UI: pílula inferior mais compacta, menu de 3 pontos fixo (estilo Expressive) e título das Configurações centralizado.
+- UI: pílula inferior mais compacta, gesto de voltar com pré-visualização (Predictive Back) e menu de 3 pontos fixo (estilo Expressive).
+- Configurações: Home mais limpo (Notificações/Idioma/Segurança/Backup movidos para “About” → “Mais opções”) e título centralizado.
 - Now Bar: seletor de cor com círculos + branco/preto e ajuste de tonalidade.
 
 ## Visitas 1.9.0-alpha.4 - 2026-04-08

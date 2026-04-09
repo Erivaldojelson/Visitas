@@ -10,13 +10,14 @@ import android.os.Bundle
 import android.provider.ContactsContract
 import android.widget.ImageView
 import android.widget.Toast
+import androidx.activity.BackEventCompat
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.activity.compose.BackHandler
 import androidx.biometric.BiometricManager
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -153,6 +154,7 @@ import com.monst.transfiranow.premium.PremiumCardsActivity
 import com.monst.transfiranow.share.CardExport
 import com.monst.transfiranow.share.CardsBackup
 import com.monst.transfiranow.ui.theme.TransfiraNowTheme
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -401,49 +403,93 @@ fun VisitasApp(
             ) { screen ->
                 when (screen) {
                     OverlayScreen.MAIN -> {
-                        val isMainTab = tab == AppTab.HOME || tab == AppTab.SAVED || tab == AppTab.SETTINGS
-                        val topTitle = when (tab) {
-                            AppTab.CREATE -> t("create_head")
-                            AppTab.PICK_SHARE -> t("picker_share_title")
-                            AppTab.PICK_EDIT -> t("picker_edit_title")
-                            AppTab.PICK_DELETE -> t("picker_delete_title")
-                            else -> ""
+                        fun isMainTab(tab: AppTab): Boolean =
+                            tab == AppTab.HOME || tab == AppTab.SAVED || tab == AppTab.SETTINGS
+
+                        fun resolveMainTab(tab: AppTab): AppTab = if (isMainTab(tab)) tab else AppTab.HOME
+
+                        val canPredictBack = !isMainTab(tab)
+                        val resolvedBackTarget = resolveMainTab(lastMainTab)
+
+                        var inPredictiveBack by remember { mutableStateOf(false) }
+                        var backProgress by remember { mutableStateOf(0f) }
+                        var backSwipeEdge by remember { mutableStateOf(BackEventCompat.EDGE_LEFT) }
+                        var backFromTab by remember { mutableStateOf<AppTab?>(null) }
+                        var backToTab by remember { mutableStateOf<AppTab?>(null) }
+
+                        PredictiveBackHandler(enabled = canPredictBack) { backEvents ->
+                            inPredictiveBack = true
+                            val from = tab
+                            val to = resolvedBackTarget
+                            backFromTab = from
+                            backToTab = to
+                            backProgress = 0f
+                            try {
+                                backEvents.collect { event ->
+                                    backSwipeEdge = event.swipeEdge
+                                    backProgress = event.progress
+                                }
+                                tab = to
+                                lastMainTab = to
+                            } catch (e: CancellationException) {
+                                // Gesture canceled.
+                            } finally {
+                                inPredictiveBack = false
+                                backProgress = 0f
+                                backFromTab = null
+                                backToTab = null
+                            }
                         }
 
-                        Scaffold(
-                            containerColor = MaterialTheme.colorScheme.background,
-                            topBar = {
-                                if (!isMainTab) {
-                                    SimpleTopBar(title = topTitle) { tab = lastMainTab }
-                                }
-                            },
-                            bottomBar = {
-                                if (isMainTab) {
-                                    PillBar(tab, t) { selected ->
-                                        tab = selected
-                                        lastMainTab = selected
+                        @Composable
+                        fun MainScaffold(tabToRender: AppTab) {
+                            val isMainTab = isMainTab(tabToRender)
+                            val topTitle = when (tabToRender) {
+                                AppTab.CREATE -> t("create_head")
+                                AppTab.PICK_SHARE -> t("picker_share_title")
+                                AppTab.PICK_EDIT -> t("picker_edit_title")
+                                AppTab.PICK_DELETE -> t("picker_delete_title")
+                                else -> ""
+                            }
+
+                            Scaffold(
+                                containerColor = MaterialTheme.colorScheme.background,
+                                topBar = {
+                                    if (!isMainTab) {
+                                        SimpleTopBar(title = topTitle) {
+                                            val target = resolveMainTab(lastMainTab)
+                                            tab = target
+                                            lastMainTab = target
+                                        }
+                                    }
+                                },
+                                bottomBar = {
+                                    if (isMainTab) {
+                                        PillBar(tabToRender, t) { selected ->
+                                            tab = selected
+                                            lastMainTab = selected
+                                        }
                                     }
                                 }
-                            }
-                        ) { padding ->
-                            val openCreate = {
-                                lastMainTab = tab
-                                viewModel.clearDraft()
-                                tab = AppTab.CREATE
-                            }
-                            val openSharePicker = {
-                                lastMainTab = tab
-                                tab = AppTab.PICK_SHARE
-                            }
-                            val openEditPicker = {
-                                lastMainTab = tab
-                                tab = AppTab.PICK_EDIT
-                            }
-                            val openDeletePicker = {
-                                lastMainTab = tab
-                                tab = AppTab.PICK_DELETE
-                            }
-                            val togglePresentationMode = togglePresentationMode@{
+                            ) { padding ->
+                                val openCreate = {
+                                    lastMainTab = resolveMainTab(tabToRender)
+                                    viewModel.clearDraft()
+                                    tab = AppTab.CREATE
+                                }
+                                val openSharePicker = {
+                                    lastMainTab = resolveMainTab(tabToRender)
+                                    tab = AppTab.PICK_SHARE
+                                }
+                                val openEditPicker = {
+                                    lastMainTab = resolveMainTab(tabToRender)
+                                    tab = AppTab.PICK_EDIT
+                                }
+                                val openDeletePicker = {
+                                    lastMainTab = resolveMainTab(tabToRender)
+                                    tab = AppTab.PICK_DELETE
+                                }
+                                val togglePresentationMode = togglePresentationMode@{
                                 val latest = uiState.cards.firstOrNull()
                                 if (latest == null) {
                                     showToast(context, t("home_empty_title"))
@@ -484,7 +530,7 @@ fun VisitasApp(
                                 }
                             }
 
-                            when (tab) {
+                            when (tabToRender) {
                                 AppTab.HOME -> CardsScreen(
                                     padding = padding,
                                     title = t("home_head"),
@@ -684,6 +730,21 @@ fun VisitasApp(
                                     onDelete = { card -> viewModel.deleteCard(card.id) }
                                 )
                             }
+                            }
+                        }
+
+                        val fromTab = backFromTab ?: tab
+                        val toTab = backToTab ?: resolvedBackTarget
+
+                        if (inPredictiveBack && backFromTab != null && backToTab != null) {
+                            PredictiveBackPreviewLayout(
+                                progress = backProgress,
+                                swipeEdge = backSwipeEdge,
+                                behind = { MainScaffold(toTab) },
+                                front = { MainScaffold(fromTab) }
+                            )
+                        } else {
+                            MainScaffold(tab)
                         }
                     }
                     OverlayScreen.DETAILS_SAVED -> {
@@ -752,37 +813,82 @@ private fun PillBar(selected: AppTab, t: (String) -> String, onSelect: (AppTab) 
         Surface(
             modifier = Modifier
                 .align(Alignment.Center)
-                .widthIn(max = 360.dp)
+                .widthIn(max = 280.dp)
                 .fillMaxWidth(),
             shape = RoundedCornerShape(999.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            tonalElevation = 2.dp,
+            shadowElevation = 10.dp
         ) {
             Row(
-                Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 6.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 56.dp)
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                PillItem(AppTab.HOME, selected, t("home"), Icons.Rounded.Home, onSelect)
-                PillItem(AppTab.SAVED, selected, t("saved"), Icons.Rounded.Style, onSelect)
-                PillItem(AppTab.SETTINGS, selected, t("settings"), Icons.Rounded.Settings, onSelect)
+                PillExpressiveItem(AppTab.HOME, selected, t("home"), Icons.Rounded.Home, onSelect)
+                PillExpressiveItem(AppTab.SAVED, selected, t("saved"), Icons.Rounded.Style, onSelect)
+                PillExpressiveItem(AppTab.SETTINGS, selected, t("settings"), Icons.Rounded.Settings, onSelect)
             }
         }
     }
 }
 
 @Composable
-private fun RowScope.PillItem(tab: AppTab, selected: AppTab, label: String, icon: ImageVector, onSelect: (AppTab) -> Unit) {
+private fun RowScope.PillExpressiveItem(
+    tab: AppTab,
+    selected: AppTab,
+    label: String,
+    icon: ImageVector,
+    onSelect: (AppTab) -> Unit
+) {
     val active = tab == selected
-    Surface(modifier = Modifier.weight(1f).clip(RoundedCornerShape(999.dp)).clickable { onSelect(tab) }, color = if (active) MaterialTheme.colorScheme.primaryContainer else Color.Transparent) {
-        Column(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(icon, label, modifier = Modifier.size(20.dp), tint = if (active) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(
-                label,
-                style = MaterialTheme.typography.labelSmall,
-                color = if (active) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+    if (active) {
+        Surface(
+            onClick = { onSelect(tab) },
+            shape = RoundedCornerShape(999.dp),
+            color = MaterialTheme.colorScheme.primaryContainer,
+            modifier = Modifier.weight(1f).height(44.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    icon,
+                    contentDescription = label,
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    label,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    } else {
+        Surface(
+            onClick = { onSelect(tab) },
+            shape = CircleShape,
+            color = Color.Transparent,
+            modifier = Modifier.size(44.dp)
+        ) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Icon(
+                    icon,
+                    contentDescription = label,
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }

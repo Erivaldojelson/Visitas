@@ -6,7 +6,8 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.widget.Toast
-import androidx.activity.compose.BackHandler
+import androidx.activity.BackEventCompat
+import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -87,6 +88,7 @@ import com.monst.transfiranow.data.AppThemeMode
 import com.monst.transfiranow.data.VisitingCard
 import com.monst.transfiranow.notifications.AppNotifications
 import com.monst.transfiranow.share.CardsBackup
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -127,11 +129,33 @@ fun OrganizedSettingsScreen(
     val scope = rememberCoroutineScope()
     var page by rememberSaveable { mutableStateOf(SettingsPage.HOME) }
 
-    BackHandler(enabled = page != SettingsPage.HOME) {
-        page = SettingsPage.HOME
+    var inPredictiveBack by remember { mutableStateOf(false) }
+    var backProgress by remember { mutableStateOf(0f) }
+    var backSwipeEdge by remember { mutableStateOf(BackEventCompat.EDGE_LEFT) }
+    var backFromPage by remember { mutableStateOf<SettingsPage?>(null) }
+
+    PredictiveBackHandler(enabled = page != SettingsPage.HOME) { backEvents ->
+        inPredictiveBack = true
+        backFromPage = page
+        backProgress = 0f
+        try {
+            backEvents.collect { event ->
+                backSwipeEdge = event.swipeEdge
+                backProgress = event.progress
+            }
+            page = SettingsPage.HOME
+        } catch (e: CancellationException) {
+            // Gesture canceled.
+        } finally {
+            inPredictiveBack = false
+            backProgress = 0f
+            backFromPage = null
+        }
     }
 
-    when (page) {
+    @Composable
+    fun SettingsContent(pageToRender: SettingsPage) {
+        when (pageToRender) {
         SettingsPage.HOME -> BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
             val side = adaptiveSidePadding(maxWidth, maxContentWidth = 720.dp)
             LazyColumn(
@@ -168,59 +192,12 @@ fun OrganizedSettingsScreen(
 
                 item {
                     SettingsNavRow(
-                        icon = Icons.Rounded.Notifications,
-                        title = t("settings_nav_notifications"),
-                        subtitle = if (notificationsEnabled) t("settings_state_on") else t("settings_state_off"),
-                    ) {
-                        page = SettingsPage.NOTIFICATIONS
-                    }
-                }
-
-                item {
-                    SettingsNavRow(
                         icon = Icons.Rounded.Settings,
                         title = t("settings_nav_now_bar"),
                         subtitle = if (liveUpdatesEnabled) t("settings_now_bar_on") else t("settings_now_bar_off"),
                         trailing = Icons.Rounded.OpenInNew
                     ) {
                         page = SettingsPage.NOW_BAR
-                    }
-                }
-
-                item {
-                    val languageLabel = when (currentLanguage) {
-                        AppLanguage.PT_BR -> "Português (Brasil)"
-                        AppLanguage.PT_PT -> "Português (Portugal)"
-                        AppLanguage.PT_AO -> "Português (Angola)"
-                        AppLanguage.EN -> "English"
-                        AppLanguage.ZH -> "中文"
-                    }
-                    SettingsNavRow(
-                        icon = Icons.Rounded.Language,
-                        title = t("language"),
-                        subtitle = languageLabel,
-                    ) {
-                        page = SettingsPage.LANGUAGE
-                    }
-                }
-
-                item {
-                    SettingsNavRow(
-                        icon = Icons.Rounded.Person,
-                        title = t("settings_nav_security"),
-                        subtitle = if (appLockEnabled) t("settings_state_on") else t("settings_state_off"),
-                    ) {
-                        page = SettingsPage.SECURITY
-                    }
-                }
-
-                item {
-                    SettingsNavRow(
-                        icon = Icons.Rounded.Share,
-                        title = t("settings_nav_backup"),
-                        subtitle = "${cards.size} ${t("saved_count")}",
-                    ) {
-                        page = SettingsPage.BACKUP
                     }
                 }
 
@@ -481,6 +458,53 @@ fun OrganizedSettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 item { SettingsTopBar(title = t("settings_nav_about")) { page = SettingsPage.HOME } }
+
+                item {
+                    val languageLabel = when (currentLanguage) {
+                        AppLanguage.PT_BR -> "Português (Brasil)"
+                        AppLanguage.PT_PT -> "Português (Portugal)"
+                        AppLanguage.PT_AO -> "Português (Angola)"
+                        AppLanguage.EN -> "English"
+                        AppLanguage.ZH -> "中文"
+                    }
+                    ElevatedCard(shape = RoundedCornerShape(28.dp)) {
+                        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text("Mais opções", style = MaterialTheme.typography.titleLarge)
+
+                            SettingsNavRow(
+                                icon = Icons.Rounded.Notifications,
+                                title = t("settings_nav_notifications"),
+                                subtitle = if (notificationsEnabled) t("settings_state_on") else t("settings_state_off"),
+                            ) {
+                                page = SettingsPage.NOTIFICATIONS
+                            }
+
+                            SettingsNavRow(
+                                icon = Icons.Rounded.Language,
+                                title = t("language"),
+                                subtitle = languageLabel,
+                            ) {
+                                page = SettingsPage.LANGUAGE
+                            }
+
+                            SettingsNavRow(
+                                icon = Icons.Rounded.Person,
+                                title = t("settings_nav_security"),
+                                subtitle = if (appLockEnabled) t("settings_state_on") else t("settings_state_off"),
+                            ) {
+                                page = SettingsPage.SECURITY
+                            }
+
+                            SettingsNavRow(
+                                icon = Icons.Rounded.Share,
+                                title = t("settings_nav_backup"),
+                                subtitle = "${cards.size} ${t("saved_count")}",
+                            ) {
+                                page = SettingsPage.BACKUP
+                            }
+                        }
+                    }
+                }
 
                 item {
                     ElevatedCard(shape = RoundedCornerShape(28.dp)) {
@@ -1001,6 +1025,19 @@ fun OrganizedSettingsScreen(
                 }
             }
         }
+    }
+    }
+
+    val frontPage = backFromPage ?: page
+    if (inPredictiveBack && backFromPage != null) {
+        PredictiveBackPreviewLayout(
+            progress = backProgress,
+            swipeEdge = backSwipeEdge,
+            behind = { SettingsContent(SettingsPage.HOME) },
+            front = { SettingsContent(frontPage) }
+        )
+    } else {
+        SettingsContent(page)
     }
 }
 
