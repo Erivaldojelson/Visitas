@@ -826,6 +826,7 @@ private fun PillBar(selected: AppTab, t: (String) -> String, onSelect: (AppTab) 
         val pillPaddingVertical = 6.dp
         val inactiveItemWidth = 44.dp
         val pillHeight = 44.dp
+        val barHeight = pillHeight + pillPaddingVertical * 2
         val expandedItemWidth =
             (pillWidth - pillPaddingHorizontal * 2 - inactiveItemWidth * 2 - itemSpacing * 2).coerceAtLeast(inactiveItemWidth)
         val toCircleSpec = tween<Float>(durationMillis = 140, easing = FastOutSlowInEasing)
@@ -896,7 +897,7 @@ private fun PillBar(selected: AppTab, t: (String) -> String, onSelect: (AppTab) 
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 56.dp)
+                    .height(barHeight)
                     .padding(horizontal = pillPaddingHorizontal, vertical = pillPaddingVertical)
             ) {
                 Surface(

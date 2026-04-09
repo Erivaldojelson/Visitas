@@ -1,5 +1,9 @@
 # Changelog
 
+## Visitas 1.9.6 - 2026-04-09
+
+- Correção: barra inferior em pílula não ocupa mais a tela inteira em alguns dispositivos.
+
 ## Visitas 1.9.5 - 2026-04-09
 
 - Configurações reorganizadas em seções (estilo “Tomato”), deixando os atalhos mais claros.
