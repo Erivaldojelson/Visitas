@@ -817,16 +817,16 @@ private fun PillBar(selected: AppTab, t: (String) -> String, onSelect: (AppTab) 
         Modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .padding(horizontal = 8.dp, vertical = 10.dp)
     ) {
-        val pillMaxWidth = 320.dp
+        val pillMaxWidth = 660.dp
         val pillWidth = maxWidth.coerceAtMost(pillMaxWidth)
         val itemSpacing = 10.dp
         val pillPaddingHorizontal = 8.dp
-        val pillPaddingVertical = 6.dp
-        val inactiveItemWidth = 44.dp
-        val pillHeight = 44.dp
+        val pillHeight = 54.dp
+        val pillPaddingVertical = 1.dp
         val barHeight = pillHeight + pillPaddingVertical * 2
+        val inactiveItemWidth = 48.dp
         val expandedItemWidth =
             (pillWidth - pillPaddingHorizontal * 2 - inactiveItemWidth * 2 - itemSpacing * 2).coerceAtLeast(inactiveItemWidth)
         val toCircleSpec = tween<Float>(durationMillis = 140, easing = FastOutSlowInEasing)
@@ -923,6 +923,7 @@ private fun PillBar(selected: AppTab, t: (String) -> String, onSelect: (AppTab) 
                         icon = Icons.Rounded.Home,
                         expandedWidth = expandedItemWidth,
                         inactiveWidth = inactiveItemWidth,
+                        height = pillHeight,
                         animationSpec = itemWidthSpec,
                         onSelect = onSelect
                     )
@@ -935,6 +936,7 @@ private fun PillBar(selected: AppTab, t: (String) -> String, onSelect: (AppTab) 
                         icon = Icons.Rounded.Style,
                         expandedWidth = expandedItemWidth,
                         inactiveWidth = inactiveItemWidth,
+                        height = pillHeight,
                         animationSpec = itemWidthSpec,
                         onSelect = onSelect
                     )
@@ -947,6 +949,7 @@ private fun PillBar(selected: AppTab, t: (String) -> String, onSelect: (AppTab) 
                         icon = Icons.Rounded.Settings,
                         expandedWidth = expandedItemWidth,
                         inactiveWidth = inactiveItemWidth,
+                        height = pillHeight,
                         animationSpec = itemWidthSpec,
                         onSelect = onSelect
                     )
@@ -965,6 +968,7 @@ private fun RowScope.PillExpressiveItem(
     icon: ImageVector,
     expandedWidth: Dp,
     inactiveWidth: Dp,
+    height: Dp,
     animationSpec: androidx.compose.animation.core.AnimationSpec<Dp>,
     onSelect: (AppTab) -> Unit
 ) {
@@ -978,7 +982,7 @@ private fun RowScope.PillExpressiveItem(
         onClick = { onSelect(tab) },
         shape = RoundedCornerShape(999.dp),
         color = Color.Transparent,
-        modifier = Modifier.width(width).height(44.dp)
+        modifier = Modifier.width(width).height(height)
     ) {
         Row(
             modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp),

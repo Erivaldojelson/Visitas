@@ -6,7 +6,7 @@ Na implementação mais recente foi, implemtado o Live update compátivel com a 
 
 ## Versao
 
-- `1.9.6`
+- `1.9.7`
 
 ## O que o app faz
 
@@ -72,7 +72,7 @@ No Windows:
 
 O APK atual gerado para distribuicao manual fica em:
 
-- `release/Visitas-v1.9.6-release.apk`
+- `release/Visitas-v1.9.7-release.apk`
 
 ## Proximos passos sugeridos
 

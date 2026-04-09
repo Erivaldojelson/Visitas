@@ -12,8 +12,8 @@ android {
         applicationId = "com.monst.transfiranow"
         minSdk = 29
         targetSdk = 36
-        versionCode = 31
-        versionName = "1.9.6"
+        versionCode = 32
+        versionName = "1.9.7"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

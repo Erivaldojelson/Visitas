@@ -1,5 +1,9 @@
 # Changelog
 
+## Visitas 1.9.7 - 2026-04-09
+
+- UI: pílula inferior maior (mais larga e mais alta) para melhorar a usabilidade.
+
 ## Visitas 1.9.6 - 2026-04-09
 
 - Correção: barra inferior em pílula não ocupa mais a tela inteira em alguns dispositivos.
