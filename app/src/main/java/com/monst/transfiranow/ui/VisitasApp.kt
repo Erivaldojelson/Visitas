@@ -828,8 +828,9 @@ private fun PillBar(selected: AppTab, t: (String) -> String, onSelect: (AppTab) 
         val pillHeight = 44.dp
         val expandedItemWidth =
             (pillWidth - pillPaddingHorizontal * 2 - inactiveItemWidth * 2 - itemSpacing * 2).coerceAtLeast(inactiveItemWidth)
-        val toCircleSpec = tween<Dp>(durationMillis = 140, easing = FastOutSlowInEasing)
-        val toExpandedSpec = tween<Dp>(durationMillis = 220, easing = FastOutSlowInEasing)
+        val toCircleSpec = tween<Float>(durationMillis = 140, easing = FastOutSlowInEasing)
+        val toExpandedSpec = tween<Float>(durationMillis = 220, easing = FastOutSlowInEasing)
+        val itemWidthSpec = tween<Dp>(durationMillis = 220, easing = FastOutSlowInEasing)
 
         var layoutSelected by remember { mutableStateOf(selected) }
         var indicatorTab by remember { mutableStateOf(selected) }
@@ -846,12 +847,12 @@ private fun PillBar(selected: AppTab, t: (String) -> String, onSelect: (AppTab) 
             return x
         }
 
-        val indicatorX = remember { Animatable(indicatorOffset(indicatorTab, layoutSelected), Dp.VectorConverter) }
-        val indicatorW = remember { Animatable(expandedItemWidth, Dp.VectorConverter) }
+        val indicatorX = remember { Animatable(indicatorOffset(indicatorTab, layoutSelected).value) }
+        val indicatorW = remember { Animatable(expandedItemWidth.value) }
 
         LaunchedEffect(pillWidth, expandedItemWidth) {
-            indicatorX.snapTo(indicatorOffset(indicatorTab, layoutSelected))
-            indicatorW.snapTo(if (layoutSelected == indicatorTab) expandedItemWidth else inactiveItemWidth)
+            indicatorX.snapTo(indicatorOffset(indicatorTab, layoutSelected).value)
+            indicatorW.snapTo((if (layoutSelected == indicatorTab) expandedItemWidth else inactiveItemWidth).value)
         }
 
         LaunchedEffect(selected, expandedItemWidth) {
@@ -860,24 +861,24 @@ private fun PillBar(selected: AppTab, t: (String) -> String, onSelect: (AppTab) 
             indicatorTab = selected
 
             if (selected == layoutSelected) {
-                val wJob = launch { indicatorW.animateTo(expandedItemWidth, animationSpec = toExpandedSpec) }
-                val xJob = launch { indicatorX.animateTo(indicatorOffset(selected, layoutSelected), animationSpec = toExpandedSpec) }
+                val wJob = launch { indicatorW.animateTo(expandedItemWidth.value, animationSpec = toExpandedSpec) }
+                val xJob = launch { indicatorX.animateTo(indicatorOffset(selected, layoutSelected).value, animationSpec = toExpandedSpec) }
                 wJob.join()
                 xJob.join()
                 return@LaunchedEffect
             }
 
             val oldLayout = layoutSelected
-            val xCircle = indicatorOffset(selected, oldLayout)
-            val wJob1 = launch { indicatorW.animateTo(inactiveItemWidth, animationSpec = toCircleSpec) }
+            val xCircle = indicatorOffset(selected, oldLayout).value
+            val wJob1 = launch { indicatorW.animateTo(inactiveItemWidth.value, animationSpec = toCircleSpec) }
             val xJob1 = launch { indicatorX.animateTo(xCircle, animationSpec = toCircleSpec) }
             wJob1.join()
             xJob1.join()
 
             layoutSelected = selected
 
-            val xExpanded = indicatorOffset(selected, selected)
-            val wJob2 = launch { indicatorW.animateTo(expandedItemWidth, animationSpec = toExpandedSpec) }
+            val xExpanded = indicatorOffset(selected, selected).value
+            val wJob2 = launch { indicatorW.animateTo(expandedItemWidth.value, animationSpec = toExpandedSpec) }
             val xJob2 = launch { indicatorX.animateTo(xExpanded, animationSpec = toExpandedSpec) }
             wJob2.join()
             xJob2.join()
@@ -903,8 +904,8 @@ private fun PillBar(selected: AppTab, t: (String) -> String, onSelect: (AppTab) 
                     color = MaterialTheme.colorScheme.primaryContainer,
                     modifier = Modifier
                         .align(Alignment.CenterStart)
-                        .offset(x = indicatorX.value)
-                        .width(indicatorW.value)
+                        .offset(x = indicatorX.value.dp)
+                        .width(indicatorW.value.dp)
                         .height(pillHeight)
                 ) {}
 
@@ -921,7 +922,7 @@ private fun PillBar(selected: AppTab, t: (String) -> String, onSelect: (AppTab) 
                         icon = Icons.Rounded.Home,
                         expandedWidth = expandedItemWidth,
                         inactiveWidth = inactiveItemWidth,
-                        animationSpec = toExpandedSpec,
+                        animationSpec = itemWidthSpec,
                         onSelect = onSelect
                     )
 
@@ -933,7 +934,7 @@ private fun PillBar(selected: AppTab, t: (String) -> String, onSelect: (AppTab) 
                         icon = Icons.Rounded.Style,
                         expandedWidth = expandedItemWidth,
                         inactiveWidth = inactiveItemWidth,
-                        animationSpec = toExpandedSpec,
+                        animationSpec = itemWidthSpec,
                         onSelect = onSelect
                     )
 
@@ -945,7 +946,7 @@ private fun PillBar(selected: AppTab, t: (String) -> String, onSelect: (AppTab) 
                         icon = Icons.Rounded.Settings,
                         expandedWidth = expandedItemWidth,
                         inactiveWidth = inactiveItemWidth,
-                        animationSpec = toExpandedSpec,
+                        animationSpec = itemWidthSpec,
                         onSelect = onSelect
                     )
                 }
