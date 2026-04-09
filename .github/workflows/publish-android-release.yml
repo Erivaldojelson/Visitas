@@ -66,4 +66,6 @@ jobs:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           prerelease: ${{ contains(github.event.inputs.tag || github.ref_name, 'alpha') }}
           body_path: release-notes.md
+          overwrite_files: true
+          fail_on_unmatched_files: true
           files: app/build/outputs/apk/release/Visitas-${{ github.event.inputs.tag || github.ref_name }}-release.apk
