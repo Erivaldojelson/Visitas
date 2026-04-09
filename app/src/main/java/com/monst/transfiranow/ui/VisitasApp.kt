@@ -32,6 +32,9 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -57,6 +60,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -809,28 +813,142 @@ fun VisitasApp(
 
 @Composable
 private fun PillBar(selected: AppTab, t: (String) -> String, onSelect: (AppTab) -> Unit) {
-    BoxWithConstraints(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 10.dp)) {
+    BoxWithConstraints(
+        Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(horizontal = 16.dp, vertical = 10.dp)
+    ) {
+        val pillMaxWidth = 320.dp
+        val pillWidth = maxWidth.coerceAtMost(pillMaxWidth)
+        val itemSpacing = 10.dp
+        val pillPaddingHorizontal = 8.dp
+        val pillPaddingVertical = 6.dp
+        val inactiveItemWidth = 44.dp
+        val pillHeight = 44.dp
+        val expandedItemWidth =
+            (pillWidth - pillPaddingHorizontal * 2 - inactiveItemWidth * 2 - itemSpacing * 2).coerceAtLeast(inactiveItemWidth)
+        val toCircleSpec = tween<Dp>(durationMillis = 140, easing = FastOutSlowInEasing)
+        val toExpandedSpec = tween<Dp>(durationMillis = 220, easing = FastOutSlowInEasing)
+
+        var layoutSelected by remember { mutableStateOf(selected) }
+        var indicatorTab by remember { mutableStateOf(selected) }
+
+        fun itemWidth(tab: AppTab, layout: AppTab): Dp = if (tab == layout) expandedItemWidth else inactiveItemWidth
+
+        fun indicatorOffset(tab: AppTab, layout: AppTab): Dp {
+            var x = 0.dp
+            val tabs = listOf(AppTab.HOME, AppTab.SAVED, AppTab.SETTINGS)
+            for (tTab in tabs) {
+                if (tTab == tab) return x
+                x += itemWidth(tTab, layout) + itemSpacing
+            }
+            return x
+        }
+
+        val indicatorX = remember { Animatable(indicatorOffset(indicatorTab, layoutSelected), Dp.VectorConverter) }
+        val indicatorW = remember { Animatable(expandedItemWidth, Dp.VectorConverter) }
+
+        LaunchedEffect(pillWidth, expandedItemWidth) {
+            indicatorX.snapTo(indicatorOffset(indicatorTab, layoutSelected))
+            indicatorW.snapTo(if (layoutSelected == indicatorTab) expandedItemWidth else inactiveItemWidth)
+        }
+
+        LaunchedEffect(selected, expandedItemWidth) {
+            if (selected == indicatorTab && selected == layoutSelected) return@LaunchedEffect
+
+            indicatorTab = selected
+
+            if (selected == layoutSelected) {
+                val wJob = launch { indicatorW.animateTo(expandedItemWidth, animationSpec = toExpandedSpec) }
+                val xJob = launch { indicatorX.animateTo(indicatorOffset(selected, layoutSelected), animationSpec = toExpandedSpec) }
+                wJob.join()
+                xJob.join()
+                return@LaunchedEffect
+            }
+
+            val oldLayout = layoutSelected
+            val xCircle = indicatorOffset(selected, oldLayout)
+            val wJob1 = launch { indicatorW.animateTo(inactiveItemWidth, animationSpec = toCircleSpec) }
+            val xJob1 = launch { indicatorX.animateTo(xCircle, animationSpec = toCircleSpec) }
+            wJob1.join()
+            xJob1.join()
+
+            layoutSelected = selected
+
+            val xExpanded = indicatorOffset(selected, selected)
+            val wJob2 = launch { indicatorW.animateTo(expandedItemWidth, animationSpec = toExpandedSpec) }
+            val xJob2 = launch { indicatorX.animateTo(xExpanded, animationSpec = toExpandedSpec) }
+            wJob2.join()
+            xJob2.join()
+        }
+
         Surface(
             modifier = Modifier
                 .align(Alignment.Center)
-                .widthIn(max = 280.dp)
-                .fillMaxWidth(),
+                .width(pillWidth),
             shape = RoundedCornerShape(999.dp),
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             tonalElevation = 2.dp,
             shadowElevation = 10.dp
         ) {
-            Row(
+            Box(
                 Modifier
                     .fillMaxWidth()
                     .heightIn(min = 56.dp)
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(horizontal = pillPaddingHorizontal, vertical = pillPaddingVertical)
             ) {
-                PillExpressiveItem(AppTab.HOME, selected, t("home"), Icons.Rounded.Home, onSelect)
-                PillExpressiveItem(AppTab.SAVED, selected, t("saved"), Icons.Rounded.Style, onSelect)
-                PillExpressiveItem(AppTab.SETTINGS, selected, t("settings"), Icons.Rounded.Settings, onSelect)
+                Surface(
+                    shape = RoundedCornerShape(999.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .offset(x = indicatorX.value)
+                        .width(indicatorW.value)
+                        .height(pillHeight)
+                ) {}
+
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalArrangement = Arrangement.spacedBy(itemSpacing),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    PillExpressiveItem(
+                        tab = AppTab.HOME,
+                        layoutSelected = layoutSelected,
+                        indicatorTab = indicatorTab,
+                        label = t("home"),
+                        icon = Icons.Rounded.Home,
+                        expandedWidth = expandedItemWidth,
+                        inactiveWidth = inactiveItemWidth,
+                        animationSpec = toExpandedSpec,
+                        onSelect = onSelect
+                    )
+
+                    PillExpressiveItem(
+                        tab = AppTab.SAVED,
+                        layoutSelected = layoutSelected,
+                        indicatorTab = indicatorTab,
+                        label = t("saved"),
+                        icon = Icons.Rounded.Style,
+                        expandedWidth = expandedItemWidth,
+                        inactiveWidth = inactiveItemWidth,
+                        animationSpec = toExpandedSpec,
+                        onSelect = onSelect
+                    )
+
+                    PillExpressiveItem(
+                        tab = AppTab.SETTINGS,
+                        layoutSelected = layoutSelected,
+                        indicatorTab = indicatorTab,
+                        label = t("settings"),
+                        icon = Icons.Rounded.Settings,
+                        expandedWidth = expandedItemWidth,
+                        inactiveWidth = inactiveItemWidth,
+                        animationSpec = toExpandedSpec,
+                        onSelect = onSelect
+                    )
+                }
             }
         }
     }
@@ -839,55 +957,54 @@ private fun PillBar(selected: AppTab, t: (String) -> String, onSelect: (AppTab) 
 @Composable
 private fun RowScope.PillExpressiveItem(
     tab: AppTab,
-    selected: AppTab,
+    layoutSelected: AppTab,
+    indicatorTab: AppTab,
     label: String,
     icon: ImageVector,
+    expandedWidth: Dp,
+    inactiveWidth: Dp,
+    animationSpec: androidx.compose.animation.core.AnimationSpec<Dp>,
     onSelect: (AppTab) -> Unit
 ) {
-    val active = tab == selected
-    if (active) {
-        Surface(
-            onClick = { onSelect(tab) },
-            shape = RoundedCornerShape(999.dp),
-            color = MaterialTheme.colorScheme.primaryContainer,
-            modifier = Modifier.weight(1f).height(44.dp)
+    val expanded = tab == layoutSelected
+    val targetWidth = if (expanded) expandedWidth else inactiveWidth
+    val width by animateDpAsState(targetValue = targetWidth, animationSpec = animationSpec, label = "pillItemWidth")
+    val onIndicator = tab == indicatorTab
+    val contentColor = if (onIndicator) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+
+    Surface(
+        onClick = { onSelect(tab) },
+        shape = RoundedCornerShape(999.dp),
+        color = Color.Transparent,
+        modifier = Modifier.width(width).height(44.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
         ) {
-            Row(
-                modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
+            Icon(
+                icon,
+                contentDescription = label,
+                modifier = Modifier.size(20.dp),
+                tint = contentColor
+            )
+            AnimatedVisibility(
+                visible = expanded,
+                enter = fadeIn(tween(160)) + slideInHorizontally(animationSpec = tween(220), initialOffsetX = { it / 5 }),
+                exit = fadeOut(tween(120)) + slideOutHorizontally(animationSpec = tween(200), targetOffsetX = { -it / 5 })
             ) {
-                Icon(
-                    icon,
-                    contentDescription = label,
-                    modifier = Modifier.size(20.dp),
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    label,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
-    } else {
-        Surface(
-            onClick = { onSelect(tab) },
-            shape = CircleShape,
-            color = Color.Transparent,
-            modifier = Modifier.size(44.dp)
-        ) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Icon(
-                    icon,
-                    contentDescription = label,
-                    modifier = Modifier.size(20.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = contentColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
         }
     }
@@ -985,19 +1102,26 @@ private fun CardsScreen(
                 }
             }
 
-            LazyColumn(
-                Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(side, 0.dp, side, 120.dp),
-                verticalArrangement = Arrangement.spacedBy(18.dp)
-            ) {
-                if (cards.isEmpty()) {
-                    item {
+            if (cards.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(start = side, end = side, bottom = 120.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(Modifier.offset(y = 24.dp)) {
                         EmptyCard(
                             t(if (isSavedScreen) "saved_empty_title" else "home_empty_title"),
                             t(if (isSavedScreen) "saved_empty_body" else "home_empty_body")
                         )
                     }
-                } else {
+                }
+            } else {
+                LazyColumn(
+                    Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(side, 0.dp, side, 120.dp),
+                    verticalArrangement = Arrangement.spacedBy(18.dp)
+                ) {
                     items(cards, key = { it.id }) { card ->
                         SavedPassCard(card = card, t = t) { onOpenDetails(card) }
                     }

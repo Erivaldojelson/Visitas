@@ -10,7 +10,8 @@
 - Configurações: novo menu “Aparência” (Claro/Escuro/Sistema, Cor dinâmica e Tema preto puro).
 - Removido “Adicionar ao Wallet do sistema” (incluindo widget e telas premium).
 - Logo/ícone atualizado para estilo 3D (fundo branco + emoji de pessoa).
-- UI: pílula inferior mais compacta, gesto de voltar com pré-visualização (Predictive Back) e menu de 3 pontos fixo (estilo Expressive).
+- UI: pílula inferior mais longa e com animação de expansão (estilo “Tomato”), gesto de voltar com pré-visualização (Predictive Back) e menu de 3 pontos fixo (estilo Expressive).
+- Home/Salvos: card de estado vazio centralizado (mais próximo do meio).
 - Configurações: Home mais limpo (Notificações/Idioma/Segurança/Backup movidos para “About” → “Mais opções”) e título centralizado.
 - Now Bar: seletor de cor com círculos + branco/preto e ajuste de tonalidade.
 
