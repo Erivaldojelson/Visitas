@@ -819,7 +819,7 @@ private fun PillBar(selected: AppTab, t: (String) -> String, onSelect: (AppTab) 
             .navigationBarsPadding()
             .padding(horizontal = 8.dp, vertical = 10.dp)
     ) {
-        val pillMaxWidth = 660.dp
+        val pillMaxWidth = 220.dp
         val pillWidth = maxWidth.coerceAtMost(pillMaxWidth)
         val itemSpacing = 10.dp
         val pillPaddingHorizontal = 8.dp

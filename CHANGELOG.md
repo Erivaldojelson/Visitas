@@ -1,5 +1,9 @@
 # Changelog
 
+## Visitas 1.9.8 - 2026-04-09
+
+- UI: pílula inferior com comprimento menor (menos larga) mantendo a altura maior.
+
 ## Visitas 1.9.7 - 2026-04-09
 
 - UI: pílula inferior maior (mais larga e mais alta) para melhorar a usabilidade.
