@@ -57,6 +57,7 @@ data class CardsUiState(
     val walletClassSuffix: String = "visitas_card",
     val walletBackendUrl: String = "",
     val appLanguage: AppLanguage = AppLanguage.PT_BR,
+    val onboardingCompleted: Boolean = false,
     val appLockEnabled: Boolean = false,
     val notificationsEnabled: Boolean = false,
     val liveUpdatesEnabled: Boolean = false,

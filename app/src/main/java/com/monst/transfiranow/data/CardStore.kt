@@ -21,6 +21,7 @@ class CardStore(private val context: Context) {
     private val classSuffixKey = stringPreferencesKey("wallet_class_suffix")
     private val backendUrlKey = stringPreferencesKey("wallet_backend_url")
     private val languageKey = stringPreferencesKey("app_language")
+    private val onboardingCompletedKey = booleanPreferencesKey("onboarding_completed")
     private val appLockKey = booleanPreferencesKey("app_lock_enabled")
     private val notificationsEnabledKey = booleanPreferencesKey("notifications_enabled")
     private val liveUpdatesEnabledKey = booleanPreferencesKey("live_updates_enabled")
@@ -34,6 +35,7 @@ class CardStore(private val context: Context) {
             walletClassSuffix = preferences[classSuffixKey] ?: "visitas_card",
             walletBackendUrl = preferences[backendUrlKey].orEmpty(),
             appLanguage = AppLanguage.fromCode(preferences[languageKey].orEmpty()),
+            onboardingCompleted = preferences[onboardingCompletedKey] ?: false,
             appLockEnabled = preferences[appLockKey] ?: false,
             notificationsEnabled = preferences[notificationsEnabledKey] ?: false,
             liveUpdatesEnabled = preferences[liveUpdatesEnabledKey] ?: false,
@@ -90,6 +92,12 @@ class CardStore(private val context: Context) {
     suspend fun persistLanguage(language: AppLanguage) {
         context.dataStore.edit { preferences ->
             preferences[languageKey] = language.code
+        }
+    }
+
+    suspend fun persistOnboardingCompleted(completed: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[onboardingCompletedKey] = completed
         }
     }
 

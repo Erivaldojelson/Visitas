@@ -51,6 +51,7 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
                         walletClassSuffix = persisted.walletClassSuffix,
                         walletBackendUrl = persisted.walletBackendUrl,
                         appLanguage = persisted.appLanguage,
+                        onboardingCompleted = persisted.onboardingCompleted,
                         appLockEnabled = persisted.appLockEnabled,
                         notificationsEnabled = persisted.notificationsEnabled,
                         liveUpdatesEnabled = persisted.liveUpdatesEnabled,
@@ -64,6 +65,12 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
                     )
                 }
             }
+        }
+    }
+
+    fun completeOnboarding() {
+        viewModelScope.launch {
+            store.persistOnboardingCompleted(true)
         }
     }
 

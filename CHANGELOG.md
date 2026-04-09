@@ -1,5 +1,10 @@
 # Changelog
 
+## Visitas 1.9.5 - 2026-04-08
+
+- Configurações reorganizadas em seções (estilo “Tomato”), deixando os atalhos mais claros.
+- Primeira abertura do app: tela de boas-vindas pedindo permissão de notificações (Android 13+) e configurando canais.
+
 ## Visitas 1.9.0-alpha.4 - 2026-04-08
 
 - Now Bar/Live Update: ícone da pílula (notificação recolhida) trocado para uma pessoa.
