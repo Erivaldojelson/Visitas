@@ -78,16 +78,16 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.monst.transfiranow.BuildConfig
 import com.monst.transfiranow.data.AppLanguage
+import com.monst.transfiranow.data.AppThemeMode
 import com.monst.transfiranow.data.VisitingCard
 import com.monst.transfiranow.notifications.AppNotifications
 import com.monst.transfiranow.share.CardsBackup
-import com.monst.transfiranow.premium.PremiumCardsActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private enum class SettingsPage { HOME, LANGUAGE, SECURITY, NOTIFICATIONS, NOW_BAR, BACKUP, ABOUT }
+private enum class SettingsPage { HOME, APPEARANCE, LANGUAGE, SECURITY, NOTIFICATIONS, NOW_BAR, BACKUP, ABOUT }
 
 private fun adaptiveSidePadding(maxWidth: Dp, maxContentWidth: Dp, minPadding: Dp = 16.dp): Dp {
     if (maxWidth <= maxContentWidth) return minPadding
@@ -104,12 +104,18 @@ fun OrganizedSettingsScreen(
     notificationsEnabled: Boolean,
     liveUpdatesEnabled: Boolean,
     nowBarColor: Int,
+    themeMode: AppThemeMode,
+    dynamicColorEnabled: Boolean,
+    pureBlackThemeEnabled: Boolean,
     t: (String) -> String,
     onLanguageSelected: (AppLanguage) -> Unit,
     onAppLockEnabledChange: (Boolean) -> Unit,
     onNotificationsEnabledChange: (Boolean) -> Unit,
     onLiveUpdatesEnabledChange: (Boolean) -> Unit,
     onNowBarColorChange: (Int) -> Unit,
+    onThemeModeChange: (AppThemeMode) -> Unit,
+    onDynamicColorEnabledChange: (Boolean) -> Unit,
+    onPureBlackThemeEnabledChange: (Boolean) -> Unit,
     onImportBackup: (Uri) -> Unit
 ) {
     val context = LocalContext.current
@@ -151,11 +157,10 @@ fun OrganizedSettingsScreen(
                 item {
                     SettingsNavRow(
                         icon = Icons.Rounded.Style,
-                        title = t("premium_ui_open"),
-                        subtitle = t("premium_ui_hint"),
-                        trailing = Icons.Rounded.OpenInNew
+                        title = t("settings_nav_appearance"),
+                        subtitle = t("settings_appearance_hint"),
                     ) {
-                        context.startActivity(Intent(context, PremiumCardsActivity::class.java))
+                        page = SettingsPage.APPEARANCE
                     }
                 }
 
@@ -224,6 +229,104 @@ fun OrganizedSettingsScreen(
                         subtitle = "Visitas ${BuildConfig.VERSION_NAME}",
                     ) {
                         page = SettingsPage.ABOUT
+                    }
+                }
+            }
+        }
+
+        SettingsPage.APPEARANCE -> BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
+            val side = adaptiveSidePadding(maxWidth, maxContentWidth = 720.dp)
+            val supportsDynamicColor = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+
+            LazyColumn(
+                Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(side, 16.dp, side, 120.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                item { SettingsTopBar(title = t("settings_nav_appearance")) { page = SettingsPage.HOME } }
+
+                item {
+                    ElevatedCard(shape = RoundedCornerShape(28.dp)) {
+                        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text(t("appearance_screen_title"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                FilterChip(
+                                    selected = themeMode == AppThemeMode.LIGHT,
+                                    onClick = { onThemeModeChange(AppThemeMode.LIGHT) },
+                                    label = { Text(t("appearance_mode_light")) }
+                                )
+                                FilterChip(
+                                    selected = themeMode == AppThemeMode.DARK,
+                                    onClick = { onThemeModeChange(AppThemeMode.DARK) },
+                                    label = { Text(t("appearance_mode_dark")) }
+                                )
+                                FilterChip(
+                                    selected = themeMode == AppThemeMode.SYSTEM,
+                                    onClick = { onThemeModeChange(AppThemeMode.SYSTEM) },
+                                    label = { Text(t("appearance_mode_system")) }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    ElevatedCard(shape = RoundedCornerShape(28.dp)) {
+                        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text(t("appearance_dynamic_title"), style = MaterialTheme.typography.titleMedium)
+                                    Text(
+                                        t("appearance_dynamic_body"),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                    if (!supportsDynamicColor) {
+                                        Text(
+                                            t("appearance_dynamic_unavailable"),
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                    }
+                                }
+                                Spacer(Modifier.width(12.dp))
+                                Switch(
+                                    checked = dynamicColorEnabled,
+                                    onCheckedChange = onDynamicColorEnabledChange,
+                                    enabled = supportsDynamicColor
+                                )
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    ElevatedCard(shape = RoundedCornerShape(28.dp)) {
+                        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text(t("appearance_pure_black_title"), style = MaterialTheme.typography.titleMedium)
+                                    Text(
+                                        t("appearance_pure_black_body"),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                }
+                                Spacer(Modifier.width(12.dp))
+                                Switch(
+                                    checked = pureBlackThemeEnabled,
+                                    onCheckedChange = onPureBlackThemeEnabledChange
+                                )
+                            }
+                        }
                     }
                 }
             }

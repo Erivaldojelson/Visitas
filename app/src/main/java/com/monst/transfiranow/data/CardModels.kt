@@ -13,6 +13,17 @@ enum class AppLanguage(val code: String) {
     }
 }
 
+enum class AppThemeMode(val code: String) {
+    SYSTEM("system"),
+    LIGHT("light"),
+    DARK("dark");
+
+    companion object {
+        fun fromCode(code: String): AppThemeMode =
+            entries.firstOrNull { it.code == code } ?: SYSTEM
+    }
+}
+
 const val DEFAULT_NOW_BAR_COLOR: Int = 0xFF1E3A8A.toInt()
 
 data class VisitingCard(
@@ -57,6 +68,9 @@ data class CardsUiState(
     val walletClassSuffix: String = "visitas_card",
     val walletBackendUrl: String = "",
     val appLanguage: AppLanguage = AppLanguage.PT_BR,
+    val themeMode: AppThemeMode = AppThemeMode.SYSTEM,
+    val dynamicColorEnabled: Boolean = true,
+    val pureBlackThemeEnabled: Boolean = false,
     val onboardingCompleted: Boolean = false,
     val appLockEnabled: Boolean = false,
     val notificationsEnabled: Boolean = false,

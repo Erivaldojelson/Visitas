@@ -9,6 +9,7 @@ import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.monst.transfiranow.data.AppLanguage
+import com.monst.transfiranow.data.AppThemeMode
 import com.monst.transfiranow.data.CardDraft
 import com.monst.transfiranow.data.CardStore
 import com.monst.transfiranow.data.CardsUiState
@@ -51,6 +52,9 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
                         walletClassSuffix = persisted.walletClassSuffix,
                         walletBackendUrl = persisted.walletBackendUrl,
                         appLanguage = persisted.appLanguage,
+                        themeMode = persisted.themeMode,
+                        dynamicColorEnabled = persisted.dynamicColorEnabled,
+                        pureBlackThemeEnabled = persisted.pureBlackThemeEnabled,
                         onboardingCompleted = persisted.onboardingCompleted,
                         appLockEnabled = persisted.appLockEnabled,
                         notificationsEnabled = persisted.notificationsEnabled,
@@ -289,6 +293,27 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
         }
         viewModelScope.launch {
             store.persistLanguage(language)
+        }
+    }
+
+    fun setThemeMode(mode: AppThemeMode) {
+        _uiState.update { it.copy(themeMode = mode) }
+        viewModelScope.launch {
+            store.persistThemeMode(mode)
+        }
+    }
+
+    fun setDynamicColorEnabled(enabled: Boolean) {
+        _uiState.update { it.copy(dynamicColorEnabled = enabled) }
+        viewModelScope.launch {
+            store.persistDynamicColorEnabled(enabled)
+        }
+    }
+
+    fun setPureBlackThemeEnabled(enabled: Boolean) {
+        _uiState.update { it.copy(pureBlackThemeEnabled = enabled) }
+        viewModelScope.launch {
+            store.persistPureBlackThemeEnabled(enabled)
         }
     }
 

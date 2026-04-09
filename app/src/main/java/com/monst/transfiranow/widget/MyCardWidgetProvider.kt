@@ -75,19 +75,6 @@ class MyCardWidgetProvider : AppWidgetProvider() {
                 views.setOnClickPendingIntent(R.id.widget_root, openPending)
                 views.setOnClickPendingIntent(R.id.widget_open, openPending)
 
-                val walletIntent = Intent(context, MainActivity::class.java).apply {
-                    action = MainActivity.ACTION_WIDGET_SAVE_TO_WALLET
-                    putExtra(MainActivity.EXTRA_CARD_ID, card?.id.orEmpty())
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                }
-                val walletPending = PendingIntent.getActivity(
-                    context,
-                    appWidgetId + 10_000,
-                    walletIntent,
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-                views.setOnClickPendingIntent(R.id.widget_wallet, walletPending)
-
                 appWidgetManager.updateAppWidget(appWidgetId, views)
             }
         }

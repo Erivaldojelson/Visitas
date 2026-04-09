@@ -67,6 +67,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.AddPhotoAlternate
 import androidx.compose.material.icons.rounded.Delete
@@ -79,11 +80,14 @@ import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.Phone
 import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Style
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -92,6 +96,7 @@ import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -158,7 +163,7 @@ import kotlin.math.floor
 import kotlin.math.sin
 import kotlin.random.Random
 
-private enum class AppTab { HOME, CREATE, SAVED, SETTINGS }
+private enum class AppTab { HOME, SAVED, SETTINGS, CREATE, PICK_SHARE, PICK_EDIT, PICK_DELETE }
 private enum class OverlayScreen { MAIN, DETAILS_SAVED, DETAILS_DRAFT }
 
 private fun adaptiveSidePadding(maxWidth: Dp, maxContentWidth: Dp, minPadding: Dp = 16.dp): Dp {
@@ -205,7 +210,18 @@ class PassDetailsActivity : ComponentActivity() {
                 else -> parseColor(currentCard?.passColor ?: uiState.draft.passColor)
             }
 
-            TransfiraNowTheme(dynamicColor = true, accentColor = accent) {
+            val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
+            val darkTheme = when (uiState.themeMode) {
+                com.monst.transfiranow.data.AppThemeMode.LIGHT -> false
+                com.monst.transfiranow.data.AppThemeMode.DARK -> true
+                else -> systemDark
+            }
+            TransfiraNowTheme(
+                dynamicColor = uiState.dynamicColorEnabled,
+                accentColor = accent,
+                darkTheme = darkTheme,
+                pureBlack = uiState.pureBlackThemeEnabled
+            ) {
                 AppLockGate(enabled = uiState.appLockEnabled) {
                     when (mode) {
                         MODE_DRAFT -> {
@@ -298,12 +314,12 @@ class PassDetailsActivity : ComponentActivity() {
 fun VisitasApp(
     onPickPhoto: () -> Unit,
     onPickQrCode: () -> Unit,
-    onSaveToWallet: (VisitingCard) -> Unit,
     viewModel: VisitasViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     var tab by remember { mutableStateOf(AppTab.HOME) }
+    var lastMainTab by rememberSaveable { mutableStateOf(AppTab.HOME) }
     val scope = rememberCoroutineScope()
     var detailsCardId by rememberSaveable { mutableStateOf<String?>(null) }
     var showDraftDetails by rememberSaveable { mutableStateOf(false) }
@@ -316,7 +332,18 @@ fun VisitasApp(
         else -> OverlayScreen.MAIN
     }
     val themeAccent = parseColor(detailsCard?.passColor ?: uiState.draft.passColor)
-    TransfiraNowTheme(dynamicColor = true, accentColor = themeAccent) {
+    val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
+    val darkTheme = when (uiState.themeMode) {
+        com.monst.transfiranow.data.AppThemeMode.LIGHT -> false
+        com.monst.transfiranow.data.AppThemeMode.DARK -> true
+        else -> systemDark
+    }
+    TransfiraNowTheme(
+        dynamicColor = uiState.dynamicColorEnabled,
+        accentColor = themeAccent,
+        darkTheme = darkTheme,
+        pureBlack = uiState.pureBlackThemeEnabled
+    ) {
         AppLockGate(enabled = uiState.appLockEnabled) {
             if (!uiState.onboardingCompleted) {
                 NotificationOnboardingScreen(t = t) { granted ->
@@ -374,10 +401,89 @@ fun VisitasApp(
             ) { screen ->
                 when (screen) {
                     OverlayScreen.MAIN -> {
+                        val isMainTab = tab == AppTab.HOME || tab == AppTab.SAVED || tab == AppTab.SETTINGS
+                        val topTitle = when (tab) {
+                            AppTab.CREATE -> t("create_head")
+                            AppTab.PICK_SHARE -> t("picker_share_title")
+                            AppTab.PICK_EDIT -> t("picker_edit_title")
+                            AppTab.PICK_DELETE -> t("picker_delete_title")
+                            else -> ""
+                        }
+
                         Scaffold(
                             containerColor = MaterialTheme.colorScheme.background,
-                            bottomBar = { PillBar(tab, t) { tab = it } }
+                            topBar = {
+                                if (!isMainTab) {
+                                    SimpleTopBar(title = topTitle) { tab = lastMainTab }
+                                }
+                            },
+                            bottomBar = {
+                                if (isMainTab) {
+                                    PillBar(tab, t) { selected ->
+                                        tab = selected
+                                        lastMainTab = selected
+                                    }
+                                }
+                            }
                         ) { padding ->
+                            val openCreate = {
+                                lastMainTab = tab
+                                viewModel.clearDraft()
+                                tab = AppTab.CREATE
+                            }
+                            val openSharePicker = {
+                                lastMainTab = tab
+                                tab = AppTab.PICK_SHARE
+                            }
+                            val openEditPicker = {
+                                lastMainTab = tab
+                                tab = AppTab.PICK_EDIT
+                            }
+                            val openDeletePicker = {
+                                lastMainTab = tab
+                                tab = AppTab.PICK_DELETE
+                            }
+                            val togglePresentationMode = togglePresentationMode@{
+                                val latest = uiState.cards.firstOrNull()
+                                if (latest == null) {
+                                    showToast(context, t("home_empty_title"))
+                                    return@togglePresentationMode
+                                }
+
+                                if (uiState.eventModeEnabled) {
+                                    AppNotifications.stopEventMode(context)
+                                    showToast(context, "Modo apresentação encerrado.")
+                                    return@togglePresentationMode
+                                }
+
+                                if (!AppNotifications.canPostNotifications(context)) {
+                                    showToast(context, "Ative as notificações para funcionar.")
+                                    AppNotifications.openAppNotificationSettings(context)
+                                    return@togglePresentationMode
+                                }
+
+                                AppNotifications.ensureChannels(context)
+                                if (!AppNotifications.isEventChannelEnabled(context)) {
+                                    showToast(context, "Ative o canal “Modo Evento” para aparecer na Now Bar.")
+                                    AppNotifications.openEventChannelSettings(context)
+                                    return@togglePresentationMode
+                                }
+
+                                AppNotifications.startEventMode(
+                                    context,
+                                    title = t("presentation_mode"),
+                                    text = latest.name.ifBlank { "Seu cartão está pronto para compartilhar" },
+                                    cardId = latest.id
+                                )
+
+                                if (Build.VERSION.SDK_INT >= 36 && !AppNotifications.canPostPromotedNotifications(context)) {
+                                    showToast(context, t("live_updates_denied"))
+                                    AppNotifications.openAppNotificationPromotionSettings(context)
+                                } else {
+                                    showToast(context, t("presentation_started"))
+                                }
+                            }
+
                             when (tab) {
                                 AppTab.HOME -> CardsScreen(
                                     padding = padding,
@@ -386,14 +492,16 @@ fun VisitasApp(
                                     message = "",
                                     cards = uiState.cards.take(10),
                                     t = t,
-                                    eventModeEnabled = uiState.eventModeEnabled,
-                                    showDelete = false,
-                                    onSaveToWallet = onSaveToWallet,
-                                    onDelete = {},
-                                    onEdit = {
-                                        viewModel.editCard(it)
-                                        tab = AppTab.CREATE
-                                    },
+                                    isSavedScreen = false,
+                                    menu = CardsMenuConfig(
+                                        showPresentation = uiState.cards.isNotEmpty(),
+                                        presentationEnabled = uiState.eventModeEnabled,
+                                        onTogglePresentation = togglePresentationMode,
+                                        onCreate = openCreate,
+                                        onShare = openSharePicker,
+                                        onEdit = openEditPicker,
+                                        onDelete = openDeletePicker
+                                    ),
                                     onOpenDetails = { card ->
                                         val intent = Intent(context, PassDetailsActivity::class.java)
                                             .putExtra(PassDetailsActivity.EXTRA_MODE, PassDetailsActivity.MODE_SAVED)
@@ -401,6 +509,55 @@ fun VisitasApp(
                                         context.startActivity(intent)
                                     }
                                 )
+
+                                AppTab.SAVED -> CardsScreen(
+                                    padding = padding,
+                                    title = t("saved_head"),
+                                    subtitle = t("saved_sub"),
+                                    message = "${uiState.cards.size} ${t("saved_count")}",
+                                    cards = uiState.cards,
+                                    t = t,
+                                    isSavedScreen = true,
+                                    menu = CardsMenuConfig(
+                                        showPresentation = false,
+                                        presentationEnabled = false,
+                                        onTogglePresentation = {},
+                                        onCreate = openCreate,
+                                        onShare = openSharePicker,
+                                        onEdit = openEditPicker,
+                                        onDelete = openDeletePicker
+                                    ),
+                                    onOpenDetails = { card ->
+                                        val intent = Intent(context, PassDetailsActivity::class.java)
+                                            .putExtra(PassDetailsActivity.EXTRA_MODE, PassDetailsActivity.MODE_SAVED)
+                                            .putExtra(PassDetailsActivity.EXTRA_CARD_ID, card.id)
+                                        context.startActivity(intent)
+                                    }
+                                )
+
+                                AppTab.SETTINGS -> OrganizedSettingsScreen(
+                                    padding = padding,
+                                    cards = uiState.cards,
+                                    currentLanguage = uiState.appLanguage,
+                                    appLockEnabled = uiState.appLockEnabled,
+                                    notificationsEnabled = uiState.notificationsEnabled,
+                                    liveUpdatesEnabled = uiState.liveUpdatesEnabled,
+                                    nowBarColor = uiState.nowBarColor,
+                                    themeMode = uiState.themeMode,
+                                    dynamicColorEnabled = uiState.dynamicColorEnabled,
+                                    pureBlackThemeEnabled = uiState.pureBlackThemeEnabled,
+                                    t = t,
+                                    onLanguageSelected = viewModel::updateLanguage,
+                                    onAppLockEnabledChange = viewModel::setAppLockEnabled,
+                                    onNotificationsEnabledChange = viewModel::setNotificationsEnabled,
+                                    onLiveUpdatesEnabledChange = viewModel::setLiveUpdatesEnabled,
+                                    onNowBarColorChange = viewModel::setNowBarColor,
+                                    onThemeModeChange = viewModel::setThemeMode,
+                                    onDynamicColorEnabledChange = viewModel::setDynamicColorEnabled,
+                                    onPureBlackThemeEnabledChange = viewModel::setPureBlackThemeEnabled,
+                                    onImportBackup = viewModel::importBackupFromUri
+                                )
+
                                 AppTab.CREATE -> CreateScreen(
                                     padding = padding,
                                     draft = uiState.draft,
@@ -503,43 +660,28 @@ fun VisitasApp(
                                         context.startActivity(intent)
                                     }
                                 )
-                                AppTab.SAVED -> CardsScreen(
+
+                                AppTab.PICK_SHARE -> SharePickerScreen(
                                     padding = padding,
-                                    title = t("saved_head"),
-                                    subtitle = t("saved_sub"),
-                                    message = "${uiState.cards.size} ${t("saved_count")}",
+                                    cards = uiState.cards,
+                                    t = t
+                                )
+
+                                AppTab.PICK_EDIT -> EditPickerScreen(
+                                    padding = padding,
                                     cards = uiState.cards,
                                     t = t,
-                                    eventModeEnabled = uiState.eventModeEnabled,
-                                    showDelete = true,
-                                    onSaveToWallet = onSaveToWallet,
-                                    onDelete = { viewModel.deleteCard(it.id) },
-                                    onEdit = {
-                                        viewModel.editCard(it)
+                                    onSelect = { card ->
+                                        viewModel.editCard(card)
                                         tab = AppTab.CREATE
-                                    },
-                                    onOpenDetails = { card ->
-                                        val intent = Intent(context, PassDetailsActivity::class.java)
-                                            .putExtra(PassDetailsActivity.EXTRA_MODE, PassDetailsActivity.MODE_SAVED)
-                                            .putExtra(PassDetailsActivity.EXTRA_CARD_ID, card.id)
-                                        context.startActivity(intent)
                                     }
                                 )
-                                AppTab.SETTINGS -> OrganizedSettingsScreen(
+
+                                AppTab.PICK_DELETE -> DeletePickerScreen(
                                     padding = padding,
                                     cards = uiState.cards,
-                                    currentLanguage = uiState.appLanguage,
-                                    appLockEnabled = uiState.appLockEnabled,
-                                    notificationsEnabled = uiState.notificationsEnabled,
-                                    liveUpdatesEnabled = uiState.liveUpdatesEnabled,
-                                    nowBarColor = uiState.nowBarColor,
                                     t = t,
-                                    onLanguageSelected = viewModel::updateLanguage,
-                                    onAppLockEnabledChange = viewModel::setAppLockEnabled,
-                                    onNotificationsEnabledChange = viewModel::setNotificationsEnabled,
-                                    onLiveUpdatesEnabledChange = viewModel::setLiveUpdatesEnabled,
-                                    onNowBarColorChange = viewModel::setNowBarColor,
-                                    onImportBackup = viewModel::importBackupFromUri
+                                    onDelete = { card -> viewModel.deleteCard(card.id) }
                                 )
                             }
                         }
@@ -620,7 +762,6 @@ private fun PillBar(selected: AppTab, t: (String) -> String, onSelect: (AppTab) 
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 PillItem(AppTab.HOME, selected, t("home"), Icons.Rounded.Home, onSelect)
-                PillItem(AppTab.CREATE, selected, t("create"), Icons.Rounded.Add, onSelect)
                 PillItem(AppTab.SAVED, selected, t("saved"), Icons.Rounded.Style, onSelect)
                 PillItem(AppTab.SETTINGS, selected, t("settings"), Icons.Rounded.Settings, onSelect)
             }
@@ -639,95 +780,414 @@ private fun RowScope.PillItem(tab: AppTab, selected: AppTab, label: String, icon
     }
 }
 
+private data class CardsMenuConfig(
+    val showPresentation: Boolean,
+    val presentationEnabled: Boolean,
+    val onTogglePresentation: () -> Unit,
+    val onCreate: () -> Unit,
+    val onShare: () -> Unit,
+    val onEdit: () -> Unit,
+    val onDelete: () -> Unit
+)
+
 @Composable
-private fun CardsScreen(padding: PaddingValues, title: String, subtitle: String, message: String, cards: List<VisitingCard>, t: (String) -> String, eventModeEnabled: Boolean, showDelete: Boolean, onSaveToWallet: (VisitingCard) -> Unit, onDelete: (VisitingCard) -> Unit, onEdit: (VisitingCard) -> Unit, onOpenDetails: (VisitingCard) -> Unit) {
+private fun CardsScreen(
+    padding: PaddingValues,
+    title: String,
+    subtitle: String,
+    message: String,
+    cards: List<VisitingCard>,
+    t: (String) -> String,
+    isSavedScreen: Boolean,
+    menu: CardsMenuConfig,
+    onOpenDetails: (VisitingCard) -> Unit
+) {
     BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
         val side = adaptiveSidePadding(maxWidth, maxContentWidth = 720.dp)
+        var menuExpanded by remember { mutableStateOf(false) }
         LazyColumn(
             Modifier.fillMaxSize(),
             contentPadding = PaddingValues(side, 16.dp, side, 120.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
-            item { ListHeader(title = title, subtitle = subtitle, message = message) }
-            if (!showDelete && cards.isNotEmpty()) {
-                item {
-                    val context = LocalContext.current
-                    val latest = cards.first()
-                    ElevatedCard(
-                        shape = RoundedCornerShape(24.dp),
-                        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                Text(t("presentation_mode"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
-                                Text(
-                                    latest.name.ifBlank { "Cartão mais recente" },
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
+            item {
+                ListHeader(title = title, subtitle = subtitle, message = message) {
+                    Box {
+                        IconButton(onClick = { menuExpanded = true }) {
+                            Icon(Icons.Rounded.MoreVert, contentDescription = null)
+                        }
+                        DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                            DropdownMenuItem(
+                                text = { Text(t("create")) },
+                                leadingIcon = { Icon(Icons.Rounded.Add, contentDescription = null) },
+                                onClick = {
+                                    menuExpanded = false
+                                    menu.onCreate()
+                                }
+                            )
+
+                            if (menu.showPresentation) {
+                                DropdownMenuItem(
+                                    text = { Text(if (menu.presentationEnabled) t("presentation_stop") else t("presentation_mode")) },
+                                    leadingIcon = { Icon(Icons.Rounded.PlayArrow, contentDescription = null) },
+                                    onClick = {
+                                        menuExpanded = false
+                                        menu.onTogglePresentation()
+                                    }
                                 )
                             }
-                            FilledTonalButton(
+
+                            DropdownMenuItem(
+                                text = { Text(t("share")) },
+                                leadingIcon = { Icon(Icons.Rounded.Share, contentDescription = null) },
                                 onClick = {
-                                    if (eventModeEnabled) {
-                                        AppNotifications.stopEventMode(context)
-                                        showToast(context, "Modo Evento encerrado.")
-                                        return@FilledTonalButton
-                                    }
-
-                                    if (!AppNotifications.canPostNotifications(context)) {
-                                        showToast(context, "Ative as notificações para funcionar.")
-                                        AppNotifications.openAppNotificationSettings(context)
-                                        return@FilledTonalButton
-                                    }
-
-                                    AppNotifications.ensureChannels(context)
-                                    if (!AppNotifications.isEventChannelEnabled(context)) {
-                                        showToast(context, "Ative o canal “Modo Evento” para aparecer na Now Bar.")
-                                        AppNotifications.openEventChannelSettings(context)
-                                        return@FilledTonalButton
-                                    }
-
-                                    AppNotifications.startEventMode(
-                                        context,
-                                        title = t("presentation_mode"),
-                                        text = latest.name.ifBlank { "Seu cartão está pronto para compartilhar" },
-                                        cardId = latest.id
-                                    )
-
-                                     if (Build.VERSION.SDK_INT >= 36 && !AppNotifications.canPostPromotedNotifications(context)) {
-                                         showToast(context, t("live_updates_denied"))
-                                         AppNotifications.openAppNotificationPromotionSettings(context)
-                                     } else {
-                                         showToast(context, t("presentation_started"))
-                                     }
+                                    menuExpanded = false
+                                    menu.onShare()
                                 }
-                            ) { Text(if (eventModeEnabled) "Encerrar" else "Ativar") }
+                            )
+
+                            DropdownMenuItem(
+                                text = { Text(t("edit")) },
+                                leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
+                                onClick = {
+                                    menuExpanded = false
+                                    menu.onEdit()
+                                }
+                            )
+
+                            DropdownMenuItem(
+                                text = { Text(t("delete")) },
+                                leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null) },
+                                onClick = {
+                                    menuExpanded = false
+                                    menu.onDelete()
+                                }
+                            )
                         }
                     }
                 }
             }
-            if (cards.isEmpty()) item { EmptyCard(t(if (showDelete) "saved_empty_title" else "home_empty_title"), t(if (showDelete) "saved_empty_body" else "home_empty_body")) }
-            else items(cards, key = { it.id }) { card -> SavedPassCard(card, t, showDelete, { onEdit(card) }, { onDelete(card) }, { onSaveToWallet(card) }, { onOpenDetails(card) }) }
+
+            if (cards.isEmpty()) {
+                item {
+                    EmptyCard(
+                        t(if (isSavedScreen) "saved_empty_title" else "home_empty_title"),
+                        t(if (isSavedScreen) "saved_empty_body" else "home_empty_body")
+                    )
+                }
+            } else {
+                items(cards, key = { it.id }) { card ->
+                    SavedPassCard(card = card, t = t) { onOpenDetails(card) }
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun ListHeader(title: String, subtitle: String, message: String) {
+private fun ListHeader(title: String, subtitle: String, message: String, actions: @Composable (() -> Unit)? = null) {
     val config = androidx.compose.ui.platform.LocalConfiguration.current
     val compact = config.screenHeightDp < 620 || config.screenWidthDp < 360
 
-    Column(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(title, style = if (compact) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold)
-        if (subtitle.isNotBlank()) Text(subtitle, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        if (message.isNotBlank()) Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(title, style = if (compact) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold)
+            if (subtitle.isNotBlank()) Text(subtitle, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (message.isNotBlank()) Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+        }
+        actions?.invoke()
     }
+}
+
+@Composable
+private fun SimpleTopBar(title: String, onBack: () -> Unit) {
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxWidth()
+            .statusBarsPadding()
+            .padding(top = 18.dp, bottom = 12.dp)
+    ) {
+        val side = adaptiveSidePadding(maxWidth, maxContentWidth = 720.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = side),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                onClick = onBack,
+                modifier = Modifier.size(44.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh
+            ) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null)
+                }
+            }
+
+            Text(
+                title,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun SharePickerScreen(
+    padding: PaddingValues,
+    cards: List<VisitingCard>,
+    t: (String) -> String
+) {
+    var selected by remember { mutableStateOf<VisitingCard?>(null) }
+
+    selected?.let { card ->
+        ShareFormatDialog(
+            card = card,
+            t = t,
+            onDismiss = { selected = null }
+        )
+    }
+
+    CardPickerList(
+        padding = padding,
+        cards = cards,
+        emptyTitle = t("saved_empty_title"),
+        emptyBody = t("saved_empty_body"),
+        onSelect = { selected = it }
+    )
+}
+
+@Composable
+private fun EditPickerScreen(
+    padding: PaddingValues,
+    cards: List<VisitingCard>,
+    t: (String) -> String,
+    onSelect: (VisitingCard) -> Unit
+) {
+    CardPickerList(
+        padding = padding,
+        cards = cards,
+        emptyTitle = t("saved_empty_title"),
+        emptyBody = t("saved_empty_body"),
+        onSelect = onSelect
+    )
+}
+
+@Composable
+private fun DeletePickerScreen(
+    padding: PaddingValues,
+    cards: List<VisitingCard>,
+    t: (String) -> String,
+    onDelete: (VisitingCard) -> Unit
+) {
+    val context = LocalContext.current
+    var pending by remember { mutableStateOf<VisitingCard?>(null) }
+
+    pending?.let { card ->
+        AlertDialog(
+            onDismissRequest = { pending = null },
+            title = { Text(t("delete")) },
+            text = { Text(t("delete_confirm")) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pending = null
+                        onDelete(card)
+                        showToast(context, t("pass_deleted"))
+                    }
+                ) { Text(t("delete")) }
+            },
+            dismissButton = {
+                TextButton(onClick = { pending = null }) { Text(t("cancel")) }
+            }
+        )
+    }
+
+    CardPickerList(
+        padding = padding,
+        cards = cards,
+        emptyTitle = t("saved_empty_title"),
+        emptyBody = t("saved_empty_body"),
+        onSelect = { pending = it }
+    )
+}
+
+@Composable
+private fun CardPickerList(
+    padding: PaddingValues,
+    cards: List<VisitingCard>,
+    emptyTitle: String,
+    emptyBody: String,
+    onSelect: (VisitingCard) -> Unit
+) {
+    BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
+        val side = adaptiveSidePadding(maxWidth, maxContentWidth = 720.dp)
+        LazyColumn(
+            Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(side, 16.dp, side, 120.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            if (cards.isEmpty()) {
+                item { EmptyCard(emptyTitle, emptyBody) }
+            } else {
+                items(cards, key = { it.id }) { card ->
+                    CardPickerRow(card = card) { onSelect(card) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CardPickerRow(card: VisitingCard, onClick: () -> Unit) {
+    val accent = parseColor(card.passColor)
+    val subtitle = listOfNotNull(
+        card.role.trim().takeIf { it.isNotBlank() },
+        card.phone.trim().takeIf { it.isNotBlank() },
+        card.email.trim().takeIf { it.isNotBlank() }
+    ).joinToString(" • ")
+
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(shape = RoundedCornerShape(18.dp), color = accent.copy(alpha = 0.16f)) {
+                Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                    if (card.avatarEmoji.isNotBlank()) {
+                        Text(card.avatarEmoji.trim(), style = MaterialTheme.typography.titleLarge)
+                    } else {
+                        Icon(Icons.Rounded.Person, contentDescription = null, tint = accent)
+                    }
+                }
+            }
+
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    card.name.ifBlank { "Sem nome" },
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (subtitle.isNotBlank()) {
+                    Text(
+                        subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            Icon(
+                Icons.AutoMirrored.Rounded.ArrowForward,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun ShareFormatDialog(
+    card: VisitingCard,
+    t: (String) -> String,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    fun shareAsync(block: suspend () -> Unit) {
+        scope.launch {
+            onDismiss()
+            runCatching { block() }.onFailure { error ->
+                showToast(context, error.message ?: "Falha ao compartilhar.")
+            }
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(t("share")) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                FilledTonalButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = {
+                        shareAsync {
+                            val uri = withContext(Dispatchers.IO) { CardExport.exportPng(context, card) }
+                            shareFile(context, uri, "image/png", t("share"))
+                        }
+                    }
+                ) { Text(t("share_image")) }
+
+                FilledTonalButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = {
+                        shareAsync {
+                            val uri = withContext(Dispatchers.IO) { CardExport.exportPdf(context, card) }
+                            shareFile(context, uri, "application/pdf", t("share"))
+                        }
+                    }
+                ) { Text(t("share_pdf")) }
+
+                FilledTonalButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = {
+                        shareAsync {
+                            val uri = withContext(Dispatchers.IO) { CardExport.exportVcf(context, card) }
+                            shareFile(context, uri, "text/x-vcard", t("share"))
+                        }
+                    }
+                ) { Text(t("share_vcard")) }
+
+                FilledTonalButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = {
+                        onDismiss()
+                        runCatching {
+                            val notes = buildList {
+                                card.note.trim().takeIf { it.isNotBlank() }?.let { add(it) }
+                                card.instagram.trim().takeIf { it.isNotBlank() }?.let { add("Instagram: $it") }
+                                card.linkedin.trim().takeIf { it.isNotBlank() }?.let { add("LinkedIn: $it") }
+                                card.website.trim().takeIf { it.isNotBlank() }?.let { add("Website: $it") }
+                            }.joinToString("\n")
+
+                            val intent = Intent(ContactsContract.Intents.Insert.ACTION).apply {
+                                type = ContactsContract.RawContacts.CONTENT_TYPE
+                                putExtra(ContactsContract.Intents.Insert.NAME, card.name.trim())
+                                putExtra(ContactsContract.Intents.Insert.JOB_TITLE, card.role.trim())
+                                putExtra(ContactsContract.Intents.Insert.PHONE, card.phone.trim())
+                                putExtra(ContactsContract.Intents.Insert.EMAIL, card.email.trim())
+                                putExtra(ContactsContract.Intents.Insert.NOTES, notes)
+                            }
+                            context.startActivity(intent)
+                        }.onFailure { error ->
+                            showToast(context, error.message ?: "Falha ao abrir Contatos.")
+                        }
+                    }
+                ) { Text(t("share_contacts")) }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(t("cancel")) }
+        }
+    )
 }
 
 @Composable
@@ -1607,11 +2067,12 @@ private fun DraftPreview(draft: CardDraft, passLabel: String, t: (String) -> Str
 }
 
 @Composable
-private fun SavedPassCard(card: VisitingCard, t: (String) -> String, showDelete: Boolean, onEdit: () -> Unit, onDelete: () -> Unit, onSaveToWallet: () -> Unit, onOpenDetails: () -> Unit) {
+private fun SavedPassCard(
+    card: VisitingCard,
+    t: (String) -> String,
+    onOpenDetails: () -> Unit
+) {
     val accentColor = parseColor(card.passColor)
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var shareMenuExpanded by remember(card.id) { mutableStateOf(false) }
     val phone = card.phone.ifBlank { "Sem telefone" }
     val email = card.email.ifBlank { "Sem email" }
 
@@ -1718,107 +2179,6 @@ private fun SavedPassCard(card: VisitingCard, t: (String) -> String, showDelete:
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(30.dp),
-                    color = Color.Black.copy(alpha = 0.22f)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        FilledTonalButton(onClick = onEdit) {
-                            Icon(Icons.Rounded.Edit, null)
-                            if (showDelete) {
-                                Spacer(Modifier.width(8.dp))
-                                Text(t("edit"))
-                            }
-                        }
-                        Box {
-                            FilledTonalButton(onClick = { shareMenuExpanded = true }) {
-                                Icon(Icons.Rounded.Share, null)
-                            }
-                            DropdownMenu(expanded = shareMenuExpanded, onDismissRequest = { shareMenuExpanded = false }) {
-                                DropdownMenuItem(
-                                    text = { Text(t("share_image")) },
-                                    onClick = {
-                                        shareMenuExpanded = false
-                                        scope.launch {
-                                            runCatching {
-                                                val uri = withContext(Dispatchers.IO) { CardExport.exportPng(context, card) }
-                                                shareFile(context, uri, "image/png", t("share"))
-                                            }.onFailure { error ->
-                                                showToast(context, error.message ?: "Falha ao exportar imagem.")
-                                            }
-                                        }
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(t("share_pdf")) },
-                                    onClick = {
-                                        shareMenuExpanded = false
-                                        scope.launch {
-                                            runCatching {
-                                                val uri = withContext(Dispatchers.IO) { CardExport.exportPdf(context, card) }
-                                                shareFile(context, uri, "application/pdf", t("share"))
-                                            }.onFailure { error ->
-                                                showToast(context, error.message ?: "Falha ao exportar PDF.")
-                                            }
-                                        }
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(t("share_vcard")) },
-                                    onClick = {
-                                        shareMenuExpanded = false
-                                        scope.launch {
-                                            runCatching {
-                                                val uri = withContext(Dispatchers.IO) { CardExport.exportVcf(context, card) }
-                                                shareFile(context, uri, "text/x-vcard", t("share"))
-                                            }.onFailure { error ->
-                                                showToast(context, error.message ?: "Falha ao exportar vCard.")
-                                            }
-                                        }
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(t("share_contacts")) },
-                                    onClick = {
-                                        shareMenuExpanded = false
-                                        runCatching {
-                                            val notes = buildList {
-                                                card.note.trim().takeIf { it.isNotBlank() }?.let { add(it) }
-                                                card.instagram.trim().takeIf { it.isNotBlank() }?.let { add("Instagram: $it") }
-                                                card.linkedin.trim().takeIf { it.isNotBlank() }?.let { add("LinkedIn: $it") }
-                                                card.website.trim().takeIf { it.isNotBlank() }?.let { add("Website: $it") }
-                                            }.joinToString("\n")
-
-                                            val intent = Intent(ContactsContract.Intents.Insert.ACTION).apply {
-                                                type = ContactsContract.RawContacts.CONTENT_TYPE
-                                                putExtra(ContactsContract.Intents.Insert.NAME, card.name.trim())
-                                                putExtra(ContactsContract.Intents.Insert.JOB_TITLE, card.role.trim())
-                                                putExtra(ContactsContract.Intents.Insert.PHONE, card.phone.trim())
-                                                putExtra(ContactsContract.Intents.Insert.EMAIL, card.email.trim())
-                                                putExtra(ContactsContract.Intents.Insert.NOTES, notes)
-                                            }
-                                            context.startActivity(intent)
-                                        }.onFailure { error ->
-                                            showToast(context, error.message ?: "Falha ao abrir Contatos.")
-                                        }
-                                    }
-                                )
-                            }
-                        }
-                        WalletActionButton(onClick = onSaveToWallet, label = t("wallet_add"), modifier = Modifier.weight(1f))
-                        if (showDelete) TextButton(onClick = onDelete) {
-                            Icon(Icons.Rounded.Delete, null)
-                            Spacer(Modifier.width(4.dp))
-                            Text(t("delete"))
-                        }
-                    }
-                }
             }
         }
     }
@@ -2561,7 +2921,18 @@ private fun showToast(context: android.content.Context, message: String) {
 private fun tr(language: AppLanguage, key: String): String {
     val pt = mapOf("home" to "Home", "create" to "Criar", "saved" to "Salvos", "settings" to "Config.", "home_head" to "Recentes", "home_sub" to "", "home_empty_title" to "Sem cartões recentes", "home_empty_body" to "Crie um passe para vê-lo aqui.", "create_head" to "Criar cartão", "create_sub" to "Abra o campo criar e monte o passe.", "create_hint" to "Personalize apenas a cor do passe.", "saved_head" to "Todos os cartões salvos", "saved_sub" to "Aqui ficam todos os cartões guardados.", "saved_count" to "cartões salvos", "saved_empty_title" to "Sem cartões salvos", "saved_empty_body" to "Os cartões criados aparecem aqui.", "settings_head" to "Configurações", "settings_sub" to "Idioma, segurança, notificações e backup.", "version" to "Versão", "github" to "Minha conta do GitHub", "language" to "Idioma do app", "contacts" to "Contatos", "terms" to "Termo", "open_create" to "Abrir criar", "edit" to "Editar", "delete" to "Excluir", "pass" to "Passe", "add_photo" to "Adicionar foto", "change_photo" to "Trocar foto", "photo_hint" to "A foto fica salva no app. Para aparecer no Google Wallet, use uma URL pública.", "name" to "Nome", "emoji" to "Emoji", "role" to "Cargo", "phone" to "Celular", "email" to "Email", "instagram" to "Instagram", "linkedin" to "LinkedIn", "url" to "URL", "note" to "Nota", "qr_code" to "QR code", "wallet_photo" to "URL pública da foto para o Wallet", "pass_color" to "Cor do passe", "create_pass" to "Criar passe", "clear" to "Limpar", "wallet" to "Google Wallet", "wallet_on" to "Google Wallet disponível neste aparelho.", "wallet_off" to "Google Wallet indisponível ou não elegível neste aparelho.", "backend" to "URL do backend JWT", "wallet_save" to "Salvar configuração do Wallet", "wallet_add" to "Salvar no Wallet")
     val pt2 = pt + mapOf("qr_pick" to "Selecionar imagem de QR Code", "qr_change" to "Trocar QR", "qr_remove" to "Remover QR", "qr_scan" to "Escanear QR", "vcf_import" to "Importar vCard (.vcf)", "backup" to "Backup", "backup_export" to "Exportar", "backup_import" to "Importar", "share" to "Compartilhar", "share_image" to "Imagem (PNG)", "share_pdf" to "PDF", "share_vcard" to "vCard (.vcf)", "share_contacts" to "Salvar nos contatos", "presentation_mode" to "Modo apresentação", "presentation_started" to "Modo apresentação ativado.", "live_updates_denied" to "Permita Live Updates para aparecer na Now Bar.", "premium_ui_open" to "Abrir UI Premium", "premium_ui_hint" to "Nova interface com estilo premium (Apple + Material You).", "onboarding_welcome_to" to "Bem-vindo ao", "onboarding_badge" to "Versão", "onboarding_notifications_title" to "Notificações", "onboarding_notifications_body" to "Ative para receber avisos e Live Updates.", "onboarding_cta" to "Vamos lá!", "onboarding_notifications_system_disabled" to "Ative “Permitir notificações” nas configurações do sistema.", "onboarding_notifications_denied" to "Permissão de notificações negada. Você pode ativar depois em Configurações.")
-    val pt3 = pt2 + mapOf(
+    val pt2b = pt2 + mapOf(
+        "cancel" to "Cancelar",
+        "delete_confirm" to "Tem certeza que deseja excluir este cartão?",
+        "picker_share_title" to "Escolher cartão para compartilhar",
+        "picker_edit_title" to "Escolher cartão para editar",
+        "picker_delete_title" to "Escolher cartão para excluir",
+        "presentation_stop" to "Encerrar modo apresentação",
+        "pass_deleted" to "Passe removido."
+    )
+    val pt3 = pt2b + mapOf(
+        "settings_nav_appearance" to "Aparência",
+        "settings_appearance_hint" to "Tela, cor dinâmica e tema escuro.",
         "settings_nav_notifications" to "Notificações",
         "settings_nav_now_bar" to "Now Bar",
         "settings_nav_security" to "Segurança",
@@ -2580,11 +2951,31 @@ private fun tr(language: AppLanguage, key: String): String {
         "settings_notifications_needs_permission" to "Permita a permissão de notificações para funcionar.",
         "settings_open_notification_settings" to "Abrir configurações de notificações",
         "settings_now_bar_needs_notifications" to "Ative as notificações para usar Live Updates/Now Bar.",
-        "settings_go_to_notifications" to "Ir para Notificações"
+        "settings_go_to_notifications" to "Ir para Notificações",
+        "appearance_screen_title" to "Tela",
+        "appearance_mode_light" to "Claro",
+        "appearance_mode_dark" to "Escuro",
+        "appearance_mode_system" to "Sistema",
+        "appearance_dynamic_title" to "Cor dinâmica",
+        "appearance_dynamic_body" to "Adapte as cores do tema a partir do seu papel de parede.",
+        "appearance_dynamic_unavailable" to "Disponível no Android 12+.",
+        "appearance_pure_black_title" to "Tema escuro (preto puro)",
+        "appearance_pure_black_body" to "Use um tema preto escuro puro."
     )
     val en = mapOf("home" to "Home", "create" to "Create", "saved" to "Saved", "settings" to "Settings", "home_head" to "Recents", "home_sub" to "", "home_empty_title" to "No recent cards", "home_empty_body" to "Create a pass to see it here.", "create_head" to "Create card", "create_sub" to "Open the create area and build the pass.", "create_hint" to "Only customize the pass color.", "saved_head" to "All saved cards", "saved_sub" to "Every saved card appears here.", "saved_count" to "saved cards", "saved_empty_title" to "No saved cards", "saved_empty_body" to "Created cards appear here.", "settings_head" to "Settings", "settings_sub" to "Language, security, notifications and backup.", "version" to "Version", "github" to "My GitHub account", "language" to "App language", "contacts" to "Contacts", "terms" to "Terms", "open_create" to "Open create", "edit" to "Edit", "delete" to "Delete", "pass" to "Pass", "add_photo" to "Add photo", "change_photo" to "Change photo", "photo_hint" to "The photo is saved in the app. To show in Google Wallet, use a public image URL.", "name" to "Name", "emoji" to "Emoji", "role" to "Role", "phone" to "Phone", "email" to "Email", "instagram" to "Instagram", "linkedin" to "LinkedIn", "url" to "URL", "note" to "Note", "qr_code" to "QR code", "wallet_photo" to "Public photo URL for Wallet", "pass_color" to "Pass color", "create_pass" to "Create pass", "clear" to "Clear", "wallet" to "Google Wallet", "wallet_on" to "Google Wallet is available on this device.", "wallet_off" to "Google Wallet is unavailable or not eligible on this device.", "backend" to "JWT backend URL", "wallet_save" to "Save Wallet settings", "wallet_add" to "Save to Wallet", "qr_pick" to "Select QR Code image", "qr_change" to "Change QR", "qr_remove" to "Remove QR")
     val en2 = en + mapOf("qr_scan" to "Scan QR", "vcf_import" to "Import vCard (.vcf)", "backup" to "Backup", "backup_export" to "Export", "backup_import" to "Import", "share" to "Share", "share_image" to "Image (PNG)", "share_pdf" to "PDF", "share_vcard" to "vCard (.vcf)", "share_contacts" to "Save to contacts", "presentation_mode" to "Presentation mode", "presentation_started" to "Presentation mode enabled.", "live_updates_denied" to "Allow Live Updates to appear in the Now Bar.", "premium_ui_open" to "Open Premium UI", "premium_ui_hint" to "New premium interface (Apple + Material You).", "onboarding_welcome_to" to "Welcome to", "onboarding_badge" to "Version", "onboarding_notifications_title" to "Notifications", "onboarding_notifications_body" to "Enable alerts and Live Updates.", "onboarding_cta" to "Let's go!", "onboarding_notifications_system_disabled" to "Enable “Allow notifications” in system settings.", "onboarding_notifications_denied" to "Notifications permission denied. You can enable it later in Settings.")
-    val en3 = en2 + mapOf(
+    val en2b = en2 + mapOf(
+        "cancel" to "Cancel",
+        "delete_confirm" to "Are you sure you want to delete this card?",
+        "picker_share_title" to "Choose a card to share",
+        "picker_edit_title" to "Choose a card to edit",
+        "picker_delete_title" to "Choose a card to delete",
+        "presentation_stop" to "Stop presentation mode",
+        "pass_deleted" to "Pass deleted."
+    )
+    val en3 = en2b + mapOf(
+        "settings_nav_appearance" to "Appearance",
+        "settings_appearance_hint" to "Theme, dynamic color and pure black.",
         "settings_nav_notifications" to "Notifications",
         "settings_nav_now_bar" to "Now Bar",
         "settings_nav_security" to "Security",
@@ -2603,7 +2994,16 @@ private fun tr(language: AppLanguage, key: String): String {
         "settings_notifications_needs_permission" to "Allow notifications permission to work.",
         "settings_open_notification_settings" to "Open notification settings",
         "settings_now_bar_needs_notifications" to "Enable notifications to use Live Updates/Now Bar.",
-        "settings_go_to_notifications" to "Go to Notifications"
+        "settings_go_to_notifications" to "Go to Notifications",
+        "appearance_screen_title" to "Screen",
+        "appearance_mode_light" to "Light",
+        "appearance_mode_dark" to "Dark",
+        "appearance_mode_system" to "System",
+        "appearance_dynamic_title" to "Dynamic color",
+        "appearance_dynamic_body" to "Adapt theme colors from your wallpaper.",
+        "appearance_dynamic_unavailable" to "Available on Android 12+.",
+        "appearance_pure_black_title" to "Dark theme (pure black)",
+        "appearance_pure_black_body" to "Use a pure black theme."
     )
     val zh = mapOf("home" to "首页", "create" to "创建", "saved" to "已保存", "settings" to "设置", "home_head" to "最近", "home_sub" to "", "home_empty_title" to "没有最近卡片", "home_empty_body" to "创建通行证后会显示在这里。", "create_head" to "创建卡片", "create_sub" to "打开创建区域并制作通行证。", "create_hint" to "只允许自定义通行证颜色。", "saved_head" to "所有已保存卡片", "saved_sub" to "所有保存的卡片都在这里。", "saved_count" to "张已保存卡片", "saved_empty_title" to "没有已保存卡片", "saved_empty_body" to "已创建的卡片会显示在这里。", "settings_head" to "设置", "settings_sub" to "语言、安全、通知和备份。", "version" to "版本", "github" to "我的 GitHub 账号", "language" to "应用语言", "contacts" to "联系方式", "terms" to "条款", "open_create" to "打开创建", "edit" to "编辑", "delete" to "删除", "pass" to "通行证", "add_photo" to "添加照片", "change_photo" to "更换照片", "photo_hint" to "照片会保存在应用中。若要显示在 Google Wallet 中，请使用公开图片链接。", "name" to "姓名", "emoji" to "Emoji", "role" to "职位", "phone" to "手机", "email" to "邮箱", "instagram" to "Instagram", "linkedin" to "LinkedIn", "url" to "链接", "note" to "备注", "qr_code" to "二维码", "wallet_photo" to "Wallet 公开照片链接", "pass_color" to "通行证颜色", "create_pass" to "创建通行证", "clear" to "清空", "wallet" to "Google Wallet", "wallet_on" to "此设备支持 Google Wallet。", "wallet_off" to "此设备不支持 Google Wallet。", "backend" to "JWT 后端地址", "wallet_save" to "保存 Wallet 设置", "wallet_add" to "保存到 Wallet", "qr_pick" to "选择二维码图片", "qr_change" to "更换二维码", "qr_remove" to "移除二维码", "qr_scan" to "扫描二维码", "vcf_import" to "导入 vCard (.vcf)", "backup" to "备份", "backup_export" to "导出", "backup_import" to "导入", "share" to "分享", "share_image" to "图片 (PNG)", "share_pdf" to "PDF", "share_vcard" to "vCard (.vcf)", "share_contacts" to "保存到联系人", "presentation_mode" to "演示模式", "presentation_started" to "演示模式已启用。", "live_updates_denied" to "允许实时更新以在 Now Bar 中显示。", "premium_ui_open" to "打开高级界面", "premium_ui_hint" to "新界面（Apple + Material You）。", "onboarding_welcome_to" to "欢迎使用", "onboarding_badge" to "版本", "onboarding_notifications_title" to "通知", "onboarding_notifications_body" to "启用提醒和实时更新。", "onboarding_cta" to "开始吧", "onboarding_notifications_system_disabled" to "请在系统设置中启用“允许通知”。", "onboarding_notifications_denied" to "通知权限被拒绝。你可以稍后在设置中启用。")
     val zh2 = zh + mapOf(
@@ -2627,5 +3027,25 @@ private fun tr(language: AppLanguage, key: String): String {
         "settings_now_bar_needs_notifications" to "启用通知以使用实时更新/Now Bar。",
         "settings_go_to_notifications" to "前往通知"
     )
-    return when (language) { AppLanguage.EN -> en3[key] ?: key; AppLanguage.ZH -> zh2[key] ?: key; else -> pt3[key] ?: key }
+    val zh2b = zh2 + mapOf(
+        "cancel" to "取消",
+        "delete_confirm" to "确定要删除这张卡片吗？",
+        "picker_share_title" to "选择要分享的卡片",
+        "picker_edit_title" to "选择要编辑的卡片",
+        "picker_delete_title" to "选择要删除的卡片",
+        "presentation_stop" to "结束演示模式",
+        "pass_deleted" to "通行证已删除。",
+        "settings_nav_appearance" to "外观",
+        "settings_appearance_hint" to "主题、动态颜色和纯黑。",
+        "appearance_screen_title" to "屏幕",
+        "appearance_mode_light" to "浅色",
+        "appearance_mode_dark" to "深色",
+        "appearance_mode_system" to "跟随系统",
+        "appearance_dynamic_title" to "动态颜色",
+        "appearance_dynamic_body" to "根据壁纸自适应主题颜色。",
+        "appearance_dynamic_unavailable" to "仅支持 Android 12+。",
+        "appearance_pure_black_title" to "深色主题（纯黑）",
+        "appearance_pure_black_body" to "使用纯黑深色主题。"
+    )
+    return when (language) { AppLanguage.EN -> en3[key] ?: key; AppLanguage.ZH -> zh2b[key] ?: key; else -> pt3[key] ?: key }
 }

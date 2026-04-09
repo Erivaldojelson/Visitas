@@ -18,8 +18,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material.icons.rounded.Language
-import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
@@ -50,8 +48,7 @@ fun PremiumDetailScreen(
     viewModel: VisitasViewModel,
     cardId: String,
     onBack: () -> Unit,
-    onEdit: (VisitingCard) -> Unit,
-    onSaveToWallet: (VisitingCard) -> Unit
+    onEdit: (VisitingCard) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val card = uiState.cards.firstOrNull { it.id == cardId }
@@ -146,15 +143,10 @@ fun PremiumDetailScreen(
 
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    FilledTonalButton(onClick = { onEdit(card) }, modifier = Modifier.weight(1f)) {
+                    FilledTonalButton(onClick = { onEdit(card) }, modifier = Modifier.fillMaxWidth()) {
                         Icon(Icons.Rounded.Edit, null)
                         Spacer(Modifier.size(8.dp))
                         Text("Edit")
-                    }
-                    FilledTonalButton(onClick = { onSaveToWallet(card) }, modifier = Modifier.weight(1f)) {
-                        Icon(Icons.Rounded.Save, null)
-                        Spacer(Modifier.size(8.dp))
-                        Text("Wallet")
                     }
                 }
             }
@@ -196,4 +188,3 @@ private fun ActionLinks(card: VisitingCard) {
         }
     }
 }
-

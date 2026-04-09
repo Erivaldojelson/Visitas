@@ -4,6 +4,12 @@
 
 - Configurações reorganizadas em seções (estilo “Tomato”), deixando os atalhos mais claros.
 - Primeira abertura do app: tela de boas-vindas pedindo permissão de notificações (Android 13+) e configurando canais.
+- Home e Salvos: menu de 3 pontos com Criar, Partilhar, Editar e Excluir (e Modo apresentação na Home).
+- Partilhar/Editar/Excluir: telas para escolher qual cartão antes da ação.
+- Navegação: “Criar” saiu da pílula inferior e foi para o menu.
+- Configurações: novo menu “Aparência” (Claro/Escuro/Sistema, Cor dinâmica e Tema preto puro).
+- Removido “Adicionar ao Wallet do sistema” (incluindo widget e telas premium).
+- Logo/ícone atualizado para estilo 3D (fundo branco + emoji de pessoa).
 
 ## Visitas 1.9.0-alpha.4 - 2026-04-08
 

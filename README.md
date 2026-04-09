@@ -1,6 +1,6 @@
 # Visitas
 
-`Visitas` e um app Android em Kotlin com Jetpack Compose para criar cartoes pessoais personalizados, salvar esses cartoes localmente e enviar um passe generico para o Google Wallet pelo caminho oficial.
+`Visitas` e um app Android em Kotlin com Jetpack Compose para criar cartoes pessoais personalizados, salvar esses cartoes localmente e compartilhar (PNG/PDF/vCard) com facilidade.
 
 Na implementação mais recente foi, implemtado o Live update compátivel com a NOW BAR da samsung.
 
@@ -15,10 +15,10 @@ Na implementação mais recente foi, implemtado o Live update compátivel com a 
 - Mostra uma previa visual do passe antes de salvar.
 - Salva os cartoes localmente no app com DataStore.
 - Permite editar e excluir cartoes salvos.
-- Tem navegacao inferior em pilula com Home, Criar, Salvos e Configuracoes.
+- Tem navegacao inferior em pilula com Home, Salvos e Configuracoes (Criar fica no menu de 3 pontos).
 - Mostra os 10 cartoes mais recentes na Home e todos os cartoes na aba Salvos.
+- Home e Salvos tem menu de 3 pontos com Criar, Partilhar, Editar e Excluir (Modo apresentação na Home).
 - Permite trocar o idioma do app para Portugues (Brasil, Portugal e Angola), Ingles e Chines.
-- Integra com o Google Wallet Android SDK para iniciar o fluxo de salvar passe.
 - Gera o payload do passe generico no app e envia esse payload para um backend que assina o JWT.
 - Mostra as informações dos cartões na Now bar ou no Live Update da samsung.
 - Adptável a todos os formatos de tela incluíndo (Dobráveis e tablets).
@@ -76,7 +76,6 @@ O APK atual gerado para distribuicao manual fica em:
 
 ## Proximos passos sugeridos
 
-- Adicionar exportacao de imagem ou PDF do cartão.
 - Criar uma build release assinada para distribuicao publica.
 
 ## Direitos autorais

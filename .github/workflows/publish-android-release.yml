@@ -49,9 +49,21 @@ jobs:
           TAG="${{ github.event.inputs.tag || github.ref_name }}"
           mv app/build/outputs/apk/release/app-release.apk "app/build/outputs/apk/release/Visitas-${TAG}-release.apk"
 
+      - name: Extract release notes
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          VERSION="${TAG#v}"
+          awk -v ver="$VERSION" '
+            BEGIN{found=0}
+            $0 ~ ("^## Visitas " ver) {found=1; print; next}
+            found && $0 ~ "^## Visitas " {exit}
+            found {print}
+          ' CHANGELOG.md > release-notes.md
+
       - name: Publish GitHub Release (attach APK)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           prerelease: ${{ contains(github.event.inputs.tag || github.ref_name, 'alpha') }}
+          body_path: release-notes.md
           files: app/build/outputs/apk/release/Visitas-${{ github.event.inputs.tag || github.ref_name }}-release.apk

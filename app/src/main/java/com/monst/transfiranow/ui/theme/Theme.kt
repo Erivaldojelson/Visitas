@@ -19,10 +19,11 @@ fun TransfiraNowTheme(
     dynamicColor: Boolean,
     accentColor: Color,
     darkTheme: Boolean = isSystemInDarkTheme(),
+    pureBlack: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val context = LocalContext.current
-    val colorScheme = when {
+    val baseScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
@@ -44,6 +45,20 @@ fun TransfiraNowTheme(
             surfaceContainerHigh = Color(0xFFECE6F0),
             surfaceContainerHighest = Color(0xFFE6E0E9)
         )
+    }
+
+    val colorScheme = if (pureBlack && darkTheme) {
+        baseScheme.copy(
+            background = Color.Black,
+            surface = Color.Black,
+            surfaceContainerLowest = Color.Black,
+            surfaceContainerLow = Color(0xFF050505),
+            surfaceContainer = Color(0xFF0A0A0A),
+            surfaceContainerHigh = Color(0xFF0F0F0F),
+            surfaceContainerHighest = Color(0xFF141414)
+        )
+    } else {
+        baseScheme
     }
 
     (context as? Activity)?.window?.let {

@@ -1,7 +1,6 @@
 package com.monst.transfiranow.premium
 
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -36,21 +35,23 @@ class PremiumCardsActivity : FragmentActivity() {
 
         setContent {
             val uiState by viewModel.uiState.collectAsState()
-            TransfiraNowTheme(dynamicColor = true, accentColor = parseColor(uiState.draft.passColor)) {
+            val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
+            val darkTheme = when (uiState.themeMode) {
+                com.monst.transfiranow.data.AppThemeMode.LIGHT -> false
+                com.monst.transfiranow.data.AppThemeMode.DARK -> true
+                else -> systemDark
+            }
+            TransfiraNowTheme(
+                dynamicColor = uiState.dynamicColorEnabled,
+                accentColor = parseColor(uiState.draft.passColor),
+                darkTheme = darkTheme,
+                pureBlack = uiState.pureBlackThemeEnabled
+            ) {
                 AppLockGate(enabled = uiState.appLockEnabled) {
                     PremiumNavHost(
                         viewModel = viewModel,
                         onPickPhoto = { photoPicker.launch(arrayOf("image/*")) },
                         onPickQrCode = { qrPicker.launch(arrayOf("image/*")) },
-                        onSaveToWallet = { card ->
-                            viewModel.prepareWalletSaveUrl(card) { url ->
-                                runCatching {
-                                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                                }.onFailure {
-                                    viewModel.onWalletSaveResult("Não foi possível abrir o Google Wallet.")
-                                }
-                            }
-                        },
                         onClose = { finish() }
                     )
                 }

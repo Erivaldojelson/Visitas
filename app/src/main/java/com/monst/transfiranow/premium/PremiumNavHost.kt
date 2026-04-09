@@ -8,7 +8,6 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.monst.transfiranow.data.VisitingCard
 import com.monst.transfiranow.ui.VisitasViewModel
 
 private object Routes {
@@ -23,7 +22,6 @@ fun PremiumNavHost(
     viewModel: VisitasViewModel,
     onPickPhoto: () -> Unit,
     onPickQrCode: () -> Unit,
-    onSaveToWallet: (VisitingCard) -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -54,8 +52,7 @@ fun PremiumNavHost(
                 onEdit = { card ->
                     viewModel.editCard(card)
                     nav.navigate(Routes.EDIT)
-                },
-                onSaveToWallet = onSaveToWallet
+                }
             )
         }
 
@@ -70,4 +67,3 @@ fun PremiumNavHost(
         }
     }
 }
-
