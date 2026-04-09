@@ -752,7 +752,7 @@ private fun PillBar(selected: AppTab, t: (String) -> String, onSelect: (AppTab) 
         Surface(
             modifier = Modifier
                 .align(Alignment.Center)
-                .widthIn(max = 640.dp)
+                .widthIn(max = 360.dp)
                 .fillMaxWidth(),
             shape = RoundedCornerShape(999.dp),
             color = MaterialTheme.colorScheme.surfaceContainerHigh
@@ -775,7 +775,14 @@ private fun RowScope.PillItem(tab: AppTab, selected: AppTab, label: String, icon
     Surface(modifier = Modifier.weight(1f).clip(RoundedCornerShape(999.dp)).clickable { onSelect(tab) }, color = if (active) MaterialTheme.colorScheme.primaryContainer else Color.Transparent) {
         Column(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(icon, label, modifier = Modifier.size(20.dp), tint = if (active) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(label, style = MaterialTheme.typography.labelSmall, color = if (active) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+            Text(
+                label,
+                style = MaterialTheme.typography.labelSmall,
+                color = if (active) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }
@@ -805,18 +812,22 @@ private fun CardsScreen(
     BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
         val side = adaptiveSidePadding(maxWidth, maxContentWidth = 720.dp)
         var menuExpanded by remember { mutableStateOf(false) }
-        LazyColumn(
-            Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(side, 16.dp, side, 120.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp)
-        ) {
-            item {
+        Column(Modifier.fillMaxSize()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = side, end = side, top = 16.dp, bottom = 10.dp)
+            ) {
                 ListHeader(title = title, subtitle = subtitle, message = message) {
                     Box {
-                        IconButton(onClick = { menuExpanded = true }) {
-                            Icon(Icons.Rounded.MoreVert, contentDescription = null)
-                        }
-                        DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                        FrostedCircleIconButton(icon = Icons.Rounded.MoreVert, onClick = { menuExpanded = true })
+                        DropdownMenu(
+                            expanded = menuExpanded,
+                            onDismissRequest = { menuExpanded = false },
+                            shape = RoundedCornerShape(28.dp),
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+                        ) {
                             DropdownMenuItem(
                                 text = { Text(t("create")) },
                                 leadingIcon = { Icon(Icons.Rounded.Add, contentDescription = null) },
@@ -868,18 +879,56 @@ private fun CardsScreen(
                 }
             }
 
-            if (cards.isEmpty()) {
-                item {
-                    EmptyCard(
-                        t(if (isSavedScreen) "saved_empty_title" else "home_empty_title"),
-                        t(if (isSavedScreen) "saved_empty_body" else "home_empty_body")
-                    )
-                }
-            } else {
-                items(cards, key = { it.id }) { card ->
-                    SavedPassCard(card = card, t = t) { onOpenDetails(card) }
+            LazyColumn(
+                Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(side, 0.dp, side, 120.dp),
+                verticalArrangement = Arrangement.spacedBy(18.dp)
+            ) {
+                if (cards.isEmpty()) {
+                    item {
+                        EmptyCard(
+                            t(if (isSavedScreen) "saved_empty_title" else "home_empty_title"),
+                            t(if (isSavedScreen) "saved_empty_body" else "home_empty_body")
+                        )
+                    }
+                } else {
+                    items(cards, key = { it.id }) { card ->
+                        SavedPassCard(card = card, t = t) { onOpenDetails(card) }
+                    }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun FrostedCircleIconButton(
+    icon: ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        onClick = onClick,
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.55f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)),
+        modifier = modifier.size(46.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.22f),
+                            Color.Transparent
+                        )
+                    )
+                )
+                .blur(14.dp)
+        )
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface)
         }
     }
 }
@@ -1246,7 +1295,7 @@ private fun CreateInvitesEditorCard(
     onOpenDraftDetails: () -> Unit
 ) {
     val accentColor = parseColor(draft.passColor)
-    var preview by rememberSaveable { mutableStateOf(false) }
+    var preview by rememberSaveable { mutableStateOf(true) }
 
     val qrCamera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
         bitmap ?: return@rememberLauncherForActivityResult

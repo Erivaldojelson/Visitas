@@ -8,8 +8,10 @@ import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -26,6 +28,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
 import androidx.biometric.BiometricManager
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.Icons
@@ -68,11 +71,13 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.ColorUtils
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -139,17 +144,14 @@ fun OrganizedSettingsScreen(
                         Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 4.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Text(
                             t("settings_head"),
                             style = MaterialTheme.typography.headlineLarge,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Text(
-                            t("settings_sub"),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            fontWeight = FontWeight.SemiBold,
+                            textAlign = TextAlign.Center
                         )
                     }
                 }
@@ -848,43 +850,96 @@ fun OrganizedSettingsScreen(
                                             style = MaterialTheme.typography.bodyMedium
                                         )
 
-                                        val spectrum = remember {
-                                            listOf(0f, 60f, 120f, 180f, 240f, 300f, 360f).map { hue ->
-                                                Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, 1f, 1f)))
+                                        val hues = remember {
+                                            listOf(0f, 30f, 60f, 90f, 120f, 150f, 180f, 210f, 240f, 270f, 300f, 330f)
+                                        }
+
+                                        val initialHsl = remember(nowBarColor) {
+                                            val hsl = FloatArray(3)
+                                            ColorUtils.colorToHSL(nowBarColor, hsl)
+                                            hsl
+                                        }
+                                        val initialHue = initialHsl[0]
+                                        val initialTone = initialHsl[2].coerceIn(0f, 1f)
+
+                                        var hue by remember(nowBarColor) { mutableStateOf(initialHue) }
+                                        var tone by remember(nowBarColor) { mutableStateOf(initialTone) }
+
+                                        val previewColor = remember(hue, tone) {
+                                            ColorUtils.HSLToColor(floatArrayOf(hue, 1f, tone.coerceIn(0f, 1f)))
+                                        }
+
+                                        val swatchScroll = rememberScrollState()
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .horizontalScroll(swatchScroll),
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            NowBarColorSwatch(
+                                                color = Color.Black,
+                                                selected = previewColor == android.graphics.Color.BLACK,
+                                                enabled = isAndroid16
+                                            ) {
+                                                hue = 0f
+                                                tone = 0f
+                                                onNowBarColorChange(android.graphics.Color.BLACK)
+                                            }
+
+                                            hues.forEach { swatchHue ->
+                                                val safeTone = tone.coerceIn(0.12f, 0.88f)
+                                                val swatch = Color(ColorUtils.HSLToColor(floatArrayOf(swatchHue, 1f, safeTone)))
+                                                NowBarColorSwatch(
+                                                    color = swatch,
+                                                    selected = kotlin.math.abs(swatchHue - hue) < 1.5f && tone in 0.08f..0.92f,
+                                                    enabled = isAndroid16
+                                                ) {
+                                                    val nextTone = if (tone < 0.06f || tone > 0.94f) 0.5f else tone
+                                                    val nextColor = ColorUtils.HSLToColor(floatArrayOf(swatchHue, 1f, nextTone))
+                                                    hue = swatchHue
+                                                    tone = nextTone
+                                                    onNowBarColorChange(nextColor)
+                                                }
+                                            }
+
+                                            NowBarColorSwatch(
+                                                color = Color.White,
+                                                selected = previewColor == android.graphics.Color.WHITE,
+                                                enabled = isAndroid16
+                                            ) {
+                                                hue = 0f
+                                                tone = 1f
+                                                onNowBarColorChange(android.graphics.Color.WHITE)
                                             }
                                         }
 
-                                        val initialHue = remember(nowBarColor) {
-                                            val hsv = FloatArray(3)
-                                            android.graphics.Color.colorToHSV(nowBarColor, hsv)
-                                            hsv[0]
+                                        val midTone = 0.5f
+                                        val midColor = remember(hue) {
+                                            Color(ColorUtils.HSLToColor(floatArrayOf(hue, 1f, midTone)))
                                         }
-                                        var hue by remember(nowBarColor) { mutableStateOf(initialHue) }
-                                        var previewColor by remember(nowBarColor) { mutableStateOf(nowBarColor) }
-
                                         Box(
                                             Modifier
                                                 .fillMaxWidth()
                                                 .height(12.dp)
                                                 .clip(RoundedCornerShape(999.dp))
-                                                .background(Brush.horizontalGradient(spectrum))
+                                                .background(Brush.horizontalGradient(listOf(Color.Black, midColor, Color.White)))
                                         )
 
                                         Slider(
-                                            value = hue,
-                                            onValueChange = { value ->
-                                                hue = value
-                                                previewColor = android.graphics.Color.HSVToColor(floatArrayOf(value, 1f, 1f))
-                                            },
-                                            valueRange = 0f..360f,
+                                            value = tone,
+                                            onValueChange = { tone = it.coerceIn(0f, 1f) },
+                                            valueRange = 0f..1f,
                                             enabled = isAndroid16,
-                                            onValueChangeFinished = { onNowBarColorChange(previewColor) }
+                                            onValueChangeFinished = {
+                                                onNowBarColorChange(ColorUtils.HSLToColor(floatArrayOf(hue, 1f, tone)))
+                                            }
                                         )
 
                                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                             Box(
                                                 Modifier
-                                                    .size(22.dp)
+                                                    .size(26.dp)
                                                     .clip(CircleShape)
                                                     .background(Color(previewColor))
                                                     .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
@@ -959,7 +1014,7 @@ private fun SettingsNavRow(
 ) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(28.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh
     ) {
         androidx.compose.foundation.layout.Row(
@@ -994,22 +1049,58 @@ private fun SettingsNavRow(
 
 @Composable
 private fun SettingsTopBar(title: String, onBack: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    Box(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
+        contentAlignment = Alignment.Center
     ) {
         Surface(
             onClick = onBack,
             shape = CircleShape,
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            modifier = Modifier.size(44.dp)
+            modifier = Modifier.size(44.dp).align(Alignment.CenterStart)
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(Icons.AutoMirrored.Rounded.ArrowBack, null)
             }
         }
-        Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
+        Text(
+            title,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 56.dp),
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun NowBarColorSwatch(
+    color: Color,
+    selected: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    val borderColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)
+    val borderWidth = if (selected) 2.dp else 1.dp
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        shape = CircleShape,
+        color = Color.Transparent,
+        border = BorderStroke(borderWidth, borderColor),
+        modifier = Modifier.size(34.dp)
+    ) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .padding(3.dp)
+                .clip(CircleShape)
+                .background(color)
+        )
     }
 }
 

@@ -10,6 +10,8 @@
 - Configurações: novo menu “Aparência” (Claro/Escuro/Sistema, Cor dinâmica e Tema preto puro).
 - Removido “Adicionar ao Wallet do sistema” (incluindo widget e telas premium).
 - Logo/ícone atualizado para estilo 3D (fundo branco + emoji de pessoa).
+- UI: pílula inferior mais compacta, menu de 3 pontos fixo (estilo Expressive) e título das Configurações centralizado.
+- Now Bar: seletor de cor com círculos + branco/preto e ajuste de tonalidade.
 
 ## Visitas 1.9.0-alpha.4 - 2026-04-08
 
