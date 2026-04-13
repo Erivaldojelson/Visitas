@@ -6,7 +6,7 @@ Na implementação mais recente foi, implemtado o Live update compátivel com a 
 
 ## Versao
 
-- `1.9.8`
+- `1.9.9`
 
 ## O que o app faz
 
@@ -15,6 +15,9 @@ Na implementação mais recente foi, implemtado o Live update compátivel com a 
 - Mostra uma previa visual do passe antes de salvar.
 - Salva os cartoes localmente no app com DataStore.
 - Permite editar e excluir cartoes salvos.
+- Compartilha cartoes no formato proprio `.visitas-card`, preservando campos e foto para outro celular com o app instalado.
+- Inclui “Envio toque” com animacao antes de abrir o compartilhamento proximo do Android.
+- Usa o Photo Picker do Android para escolher fotos, incluindo Google Fotos quando disponivel no aparelho.
 - Tem navegacao inferior em pilula com Home, Salvos e Configuracoes (Criar fica no menu de 3 pontos).
 - Mostra os 10 cartoes mais recentes na Home e todos os cartoes na aba Salvos.
 - Home e Salvos tem menu de 3 pontos com Criar, Partilhar, Editar e Excluir (Modo apresentação na Home).
@@ -72,7 +75,7 @@ No Windows:
 
 O APK atual gerado para distribuicao manual fica em:
 
-- `release/Visitas-v1.9.8-release.apk`
+- `release/Visitas-v1.9.9-release.apk`
 
 ## Proximos passos sugeridos
 

@@ -130,7 +130,7 @@ fun PremiumEditScreen(
                             FilledTonalButton(onClick = onPickPhoto, modifier = Modifier.weight(1f)) {
                                 Icon(Icons.Rounded.Image, null)
                                 Spacer(Modifier.size(8.dp))
-                                Text("Photo")
+                                Text("Google Photos")
                             }
                             FilledTonalButton(onClick = onPickQrCode, modifier = Modifier.weight(1f)) {
                                 Icon(Icons.Rounded.QrCode2, null)

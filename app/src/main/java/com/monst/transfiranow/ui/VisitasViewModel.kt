@@ -14,6 +14,7 @@ import com.monst.transfiranow.data.CardDraft
 import com.monst.transfiranow.data.CardStore
 import com.monst.transfiranow.data.CardsUiState
 import com.monst.transfiranow.data.VisitingCard
+import com.monst.transfiranow.share.CardExchange
 import com.monst.transfiranow.share.CardsBackup
 import com.monst.transfiranow.util.VCardParser
 import com.monst.transfiranow.widget.MyCardWidgetProvider
@@ -233,6 +234,25 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
               _uiState.update { it.copy(statusMessage = "Backup importado: ${imported.size} cartões mesclados.") }
           }
       }
+
+    fun importExactCardFromUri(uri: Uri) {
+        viewModelScope.launch {
+            val imported = withContext(Dispatchers.IO) {
+                CardExchange.importPackage(getApplication(), uri)
+            }
+
+            if (imported == null) {
+                _uiState.update { it.copy(statusMessage = "Não foi possível importar este cartão do Visitas.") }
+                return@launch
+            }
+
+            store.mergeCards(listOf(imported))
+            MyCardWidgetProvider.requestUpdate(getApplication())
+            _uiState.update {
+                it.copy(statusMessage = "Cartão recebido e salvo exatamente no app.")
+            }
+        }
+    }
 
     private fun handleScannedContent(content: String) {
         val trimmed = content.trim()

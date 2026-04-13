@@ -1,6 +1,7 @@
 package com.monst.transfiranow.ui
 
 import android.Manifest
+import android.content.ClipData
 import android.graphics.Bitmap
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -155,6 +156,7 @@ import com.monst.transfiranow.data.CardDraft
 import com.monst.transfiranow.data.VisitingCard
 import com.monst.transfiranow.notifications.AppNotifications
 import com.monst.transfiranow.premium.PremiumCardsActivity
+import com.monst.transfiranow.share.CardExchange
 import com.monst.transfiranow.share.CardExport
 import com.monst.transfiranow.share.CardsBackup
 import com.monst.transfiranow.ui.theme.TransfiraNowTheme
@@ -1395,6 +1397,7 @@ private fun ShareFormatDialog(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    var touchSending by remember { mutableStateOf(false) }
 
     fun shareAsync(block: suspend () -> Unit) {
         scope.launch {
@@ -1409,63 +1412,95 @@ private fun ShareFormatDialog(
         onDismissRequest = onDismiss,
         title = { Text(t("share")) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                FilledTonalButton(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = {
-                        shareAsync {
-                            val uri = withContext(Dispatchers.IO) { CardExport.exportPng(context, card) }
-                            shareFile(context, uri, "image/png", t("share"))
-                        }
-                    }
-                ) { Text(t("share_image")) }
-
-                FilledTonalButton(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = {
-                        shareAsync {
-                            val uri = withContext(Dispatchers.IO) { CardExport.exportPdf(context, card) }
-                            shareFile(context, uri, "application/pdf", t("share"))
-                        }
-                    }
-                ) { Text(t("share_pdf")) }
-
-                FilledTonalButton(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = {
-                        shareAsync {
-                            val uri = withContext(Dispatchers.IO) { CardExport.exportVcf(context, card) }
-                            shareFile(context, uri, "text/x-vcard", t("share"))
-                        }
-                    }
-                ) { Text(t("share_vcard")) }
-
-                FilledTonalButton(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = {
-                        onDismiss()
-                        runCatching {
-                            val notes = buildList {
-                                card.note.trim().takeIf { it.isNotBlank() }?.let { add(it) }
-                                card.instagram.trim().takeIf { it.isNotBlank() }?.let { add("Instagram: $it") }
-                                card.linkedin.trim().takeIf { it.isNotBlank() }?.let { add("LinkedIn: $it") }
-                                card.website.trim().takeIf { it.isNotBlank() }?.let { add("Website: $it") }
-                            }.joinToString("\n")
-
-                            val intent = Intent(ContactsContract.Intents.Insert.ACTION).apply {
-                                type = ContactsContract.RawContacts.CONTENT_TYPE
-                                putExtra(ContactsContract.Intents.Insert.NAME, card.name.trim())
-                                putExtra(ContactsContract.Intents.Insert.JOB_TITLE, card.role.trim())
-                                putExtra(ContactsContract.Intents.Insert.PHONE, card.phone.trim())
-                                putExtra(ContactsContract.Intents.Insert.EMAIL, card.email.trim())
-                                putExtra(ContactsContract.Intents.Insert.NOTES, notes)
+            if (touchSending) {
+                TouchSendAnimation(t = t)
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FilledTonalButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = {
+                            shareAsync {
+                                val uri = withContext(Dispatchers.IO) { CardExport.exportPng(context, card) }
+                                shareFile(context, uri, "image/png", t("share"))
                             }
-                            context.startActivity(intent)
-                        }.onFailure { error ->
-                            showToast(context, error.message ?: "Falha ao abrir Contatos.")
                         }
-                    }
-                ) { Text(t("share_contacts")) }
+                    ) { Text(t("share_image")) }
+
+                    FilledTonalButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = {
+                            shareAsync {
+                                val uri = withContext(Dispatchers.IO) { CardExport.exportPdf(context, card) }
+                                shareFile(context, uri, "application/pdf", t("share"))
+                            }
+                        }
+                    ) { Text(t("share_pdf")) }
+
+                    FilledTonalButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = {
+                            shareAsync {
+                                val uri = withContext(Dispatchers.IO) { CardExport.exportVcf(context, card) }
+                                shareFile(context, uri, "text/x-vcard", t("share"))
+                            }
+                        }
+                    ) { Text(t("share_vcard")) }
+
+                    FilledTonalButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = {
+                            shareAsync {
+                                val uri = withContext(Dispatchers.IO) { CardExchange.exportPackage(context, card) }
+                                shareFile(context, uri, CardExchange.MIME_TYPE, t("share_exact"))
+                            }
+                        }
+                    ) { Text(t("share_exact")) }
+
+                    FilledTonalButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = {
+                            scope.launch {
+                                touchSending = true
+                                delay(950)
+                                runCatching {
+                                    val uri = withContext(Dispatchers.IO) { CardExchange.exportPackage(context, card) }
+                                    shareFile(context, uri, CardExchange.MIME_TYPE, t("touch_send"))
+                                    onDismiss()
+                                }.onFailure { error ->
+                                    touchSending = false
+                                    showToast(context, error.message ?: "Falha ao compartilhar.")
+                                }
+                            }
+                        }
+                    ) { Text(t("touch_send")) }
+
+                    FilledTonalButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = {
+                            onDismiss()
+                            runCatching {
+                                val notes = buildList {
+                                    card.note.trim().takeIf { it.isNotBlank() }?.let { add(it) }
+                                    card.instagram.trim().takeIf { it.isNotBlank() }?.let { add("Instagram: $it") }
+                                    card.linkedin.trim().takeIf { it.isNotBlank() }?.let { add("LinkedIn: $it") }
+                                    card.website.trim().takeIf { it.isNotBlank() }?.let { add("Website: $it") }
+                                }.joinToString("\n")
+
+                                val intent = Intent(ContactsContract.Intents.Insert.ACTION).apply {
+                                    type = ContactsContract.RawContacts.CONTENT_TYPE
+                                    putExtra(ContactsContract.Intents.Insert.NAME, card.name.trim())
+                                    putExtra(ContactsContract.Intents.Insert.JOB_TITLE, card.role.trim())
+                                    putExtra(ContactsContract.Intents.Insert.PHONE, card.phone.trim())
+                                    putExtra(ContactsContract.Intents.Insert.EMAIL, card.email.trim())
+                                    putExtra(ContactsContract.Intents.Insert.NOTES, notes)
+                                }
+                                context.startActivity(intent)
+                            }.onFailure { error ->
+                                showToast(context, error.message ?: "Falha ao abrir Contatos.")
+                            }
+                        }
+                    ) { Text(t("share_contacts")) }
+                }
             }
         },
         confirmButton = {},
@@ -1473,6 +1508,101 @@ private fun ShareFormatDialog(
             TextButton(onClick = onDismiss) { Text(t("cancel")) }
         }
     )
+}
+
+@Composable
+private fun TouchSendAnimation(t: (String) -> String) {
+    val context = LocalContext.current
+    val transports = remember {
+        touchTransportLabels(context.packageManager).joinToString(" + ")
+    }
+    val transition = rememberInfiniteTransition(label = "touch-send")
+    val pulse by transition.animateFloat(
+        initialValue = 0.78f,
+        targetValue = 1.12f,
+        animationSpec = infiniteRepeatable(tween(720, easing = FastOutSlowInEasing), repeatMode = RepeatMode.Reverse),
+        label = "touch-send-pulse"
+    )
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(Modifier.fillMaxWidth().height(132.dp), contentAlignment = Alignment.Center) {
+            Surface(
+                modifier = Modifier.size((96f * pulse).dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+            ) {}
+            Surface(
+                modifier = Modifier.size((68f * pulse).dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+            ) {}
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                TouchPhoneCard(offset = (-8f * pulse).dp)
+                TouchPhoneCard(offset = (8f * pulse).dp)
+            }
+        }
+
+        Text(
+            text = t("touch_send_anim"),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center
+        )
+        Text(
+            text = "${t("touch_send_transports")} $transports",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+        Text(
+            text = t("touch_send_hint"),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+private fun TouchPhoneCard(offset: Dp) {
+    Surface(
+        modifier = Modifier
+            .offset(x = offset)
+            .size(width = 46.dp, height = 78.dp),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.55f))
+    ) {
+        Box(Modifier.fillMaxSize().padding(7.dp), contentAlignment = Alignment.TopCenter) {
+            Surface(
+                modifier = Modifier.fillMaxWidth().height(54.dp),
+                shape = RoundedCornerShape(11.dp),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+            ) {}
+        }
+    }
+}
+
+private fun touchTransportLabels(packageManager: PackageManager): List<String> {
+    val labels = buildList {
+        if (Build.VERSION.SDK_INT >= 31 && packageManager.hasSystemFeature(PackageManager.FEATURE_UWB)) {
+            add("UWB")
+        }
+        if (packageManager.hasSystemFeature(PackageManager.FEATURE_NFC)) {
+            add("NFC")
+        }
+        if (packageManager.hasSystemFeature(PackageManager.FEATURE_WIFI_DIRECT)) {
+            add("Wi-Fi")
+        }
+        if (packageManager.hasSystemFeature(PackageManager.FEATURE_BLUETOOTH)) {
+            add("Bluetooth")
+        }
+    }
+    return labels.ifEmpty { listOf("Compartilhamento Android") }
 }
 
 @Composable
@@ -1605,7 +1735,7 @@ private fun CreateInvitesEditorCard(
                         TextButton(onClick = onPickPhoto) {
                             Icon(Icons.Rounded.AddPhotoAlternate, contentDescription = null, tint = Color.White)
                             Spacer(Modifier.width(8.dp))
-                            Text("Editar fundo", color = Color.White, fontWeight = FontWeight.SemiBold)
+                            Text(t("photo_google"), color = Color.White, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
@@ -3190,6 +3320,8 @@ private fun shareFile(context: android.content.Context, uri: Uri, mime: String, 
     val intent = Intent(Intent.ACTION_SEND).apply {
         type = mime
         putExtra(Intent.EXTRA_STREAM, uri)
+        putExtra(Intent.EXTRA_TITLE, chooserTitle)
+        clipData = ClipData.newUri(context.contentResolver, chooserTitle, uri)
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
 
@@ -3245,7 +3377,13 @@ private fun tr(language: AppLanguage, key: String): String {
         "appearance_dynamic_body" to "Adapte as cores do tema a partir do seu papel de parede.",
         "appearance_dynamic_unavailable" to "Disponível no Android 12+.",
         "appearance_pure_black_title" to "Tema escuro (preto puro)",
-        "appearance_pure_black_body" to "Use um tema preto escuro puro."
+        "appearance_pure_black_body" to "Use um tema preto escuro puro.",
+        "photo_google" to "Google Fotos",
+        "share_exact" to "Cartão do app (exato)",
+        "touch_send" to "Envio toque",
+        "touch_send_anim" to "Preparando envio por aproximação...",
+        "touch_send_transports" to "Transportes disponíveis:",
+        "touch_send_hint" to "Aproxime os celulares e escolha o envio próximo no compartilhamento do Android."
     )
     val en = mapOf("home" to "Home", "create" to "Create", "saved" to "Saved", "settings" to "Settings", "home_head" to "Recents", "home_sub" to "", "home_empty_title" to "No recent cards", "home_empty_body" to "Create a pass to see it here.", "create_head" to "Create card", "create_sub" to "Open the create area and build the pass.", "create_hint" to "Only customize the pass color.", "saved_head" to "All saved cards", "saved_sub" to "Every saved card appears here.", "saved_count" to "saved cards", "saved_empty_title" to "No saved cards", "saved_empty_body" to "Created cards appear here.", "settings_head" to "Settings", "settings_sub" to "Language, security, notifications and backup.", "version" to "Version", "github" to "My GitHub account", "language" to "App language", "contacts" to "Contacts", "terms" to "Terms", "open_create" to "Open create", "edit" to "Edit", "delete" to "Delete", "pass" to "Pass", "add_photo" to "Add photo", "change_photo" to "Change photo", "photo_hint" to "The photo is saved in the app. To show in Google Wallet, use a public image URL.", "name" to "Name", "emoji" to "Emoji", "role" to "Role", "phone" to "Phone", "email" to "Email", "instagram" to "Instagram", "linkedin" to "LinkedIn", "url" to "URL", "note" to "Note", "qr_code" to "QR code", "wallet_photo" to "Public photo URL for Wallet", "pass_color" to "Pass color", "create_pass" to "Create pass", "clear" to "Clear", "wallet" to "Google Wallet", "wallet_on" to "Google Wallet is available on this device.", "wallet_off" to "Google Wallet is unavailable or not eligible on this device.", "backend" to "JWT backend URL", "wallet_save" to "Save Wallet settings", "wallet_add" to "Save to Wallet", "qr_pick" to "Select QR Code image", "qr_change" to "Change QR", "qr_remove" to "Remove QR")
     val en2 = en + mapOf("qr_scan" to "Scan QR", "vcf_import" to "Import vCard (.vcf)", "backup" to "Backup", "backup_export" to "Export", "backup_import" to "Import", "share" to "Share", "share_image" to "Image (PNG)", "share_pdf" to "PDF", "share_vcard" to "vCard (.vcf)", "share_contacts" to "Save to contacts", "presentation_mode" to "Presentation mode", "presentation_started" to "Presentation mode enabled.", "live_updates_denied" to "Allow Live Updates to appear in the Now Bar.", "premium_ui_open" to "Open Premium UI", "premium_ui_hint" to "New premium interface (Apple + Material You).", "onboarding_welcome_to" to "Welcome to", "onboarding_badge" to "Version", "onboarding_notifications_title" to "Notifications", "onboarding_notifications_body" to "Enable alerts and Live Updates.", "onboarding_cta" to "Let's go!", "onboarding_notifications_system_disabled" to "Enable “Allow notifications” in system settings.", "onboarding_notifications_denied" to "Notifications permission denied. You can enable it later in Settings.")
@@ -3288,7 +3426,13 @@ private fun tr(language: AppLanguage, key: String): String {
         "appearance_dynamic_body" to "Adapt theme colors from your wallpaper.",
         "appearance_dynamic_unavailable" to "Available on Android 12+.",
         "appearance_pure_black_title" to "Dark theme (pure black)",
-        "appearance_pure_black_body" to "Use a pure black theme."
+        "appearance_pure_black_body" to "Use a pure black theme.",
+        "photo_google" to "Google Photos",
+        "share_exact" to "App card (exact)",
+        "touch_send" to "Tap send",
+        "touch_send_anim" to "Preparing nearby tap send...",
+        "touch_send_transports" to "Available transports:",
+        "touch_send_hint" to "Bring the phones close together and choose nearby sharing in the Android share sheet."
     )
     val zh = mapOf("home" to "首页", "create" to "创建", "saved" to "已保存", "settings" to "设置", "home_head" to "最近", "home_sub" to "", "home_empty_title" to "没有最近卡片", "home_empty_body" to "创建通行证后会显示在这里。", "create_head" to "创建卡片", "create_sub" to "打开创建区域并制作通行证。", "create_hint" to "只允许自定义通行证颜色。", "saved_head" to "所有已保存卡片", "saved_sub" to "所有保存的卡片都在这里。", "saved_count" to "张已保存卡片", "saved_empty_title" to "没有已保存卡片", "saved_empty_body" to "已创建的卡片会显示在这里。", "settings_head" to "设置", "settings_sub" to "语言、安全、通知和备份。", "version" to "版本", "github" to "我的 GitHub 账号", "language" to "应用语言", "contacts" to "联系方式", "terms" to "条款", "open_create" to "打开创建", "edit" to "编辑", "delete" to "删除", "pass" to "通行证", "add_photo" to "添加照片", "change_photo" to "更换照片", "photo_hint" to "照片会保存在应用中。若要显示在 Google Wallet 中，请使用公开图片链接。", "name" to "姓名", "emoji" to "Emoji", "role" to "职位", "phone" to "手机", "email" to "邮箱", "instagram" to "Instagram", "linkedin" to "LinkedIn", "url" to "链接", "note" to "备注", "qr_code" to "二维码", "wallet_photo" to "Wallet 公开照片链接", "pass_color" to "通行证颜色", "create_pass" to "创建通行证", "clear" to "清空", "wallet" to "Google Wallet", "wallet_on" to "此设备支持 Google Wallet。", "wallet_off" to "此设备不支持 Google Wallet。", "backend" to "JWT 后端地址", "wallet_save" to "保存 Wallet 设置", "wallet_add" to "保存到 Wallet", "qr_pick" to "选择二维码图片", "qr_change" to "更换二维码", "qr_remove" to "移除二维码", "qr_scan" to "扫描二维码", "vcf_import" to "导入 vCard (.vcf)", "backup" to "备份", "backup_export" to "导出", "backup_import" to "导入", "share" to "分享", "share_image" to "图片 (PNG)", "share_pdf" to "PDF", "share_vcard" to "vCard (.vcf)", "share_contacts" to "保存到联系人", "presentation_mode" to "演示模式", "presentation_started" to "演示模式已启用。", "live_updates_denied" to "允许实时更新以在 Now Bar 中显示。", "premium_ui_open" to "打开高级界面", "premium_ui_hint" to "新界面（Apple + Material You）。", "onboarding_welcome_to" to "欢迎使用", "onboarding_badge" to "版本", "onboarding_notifications_title" to "通知", "onboarding_notifications_body" to "启用提醒和实时更新。", "onboarding_cta" to "开始吧", "onboarding_notifications_system_disabled" to "请在系统设置中启用“允许通知”。", "onboarding_notifications_denied" to "通知权限被拒绝。你可以稍后在设置中启用。")
     val zh2 = zh + mapOf(
@@ -3330,7 +3474,13 @@ private fun tr(language: AppLanguage, key: String): String {
         "appearance_dynamic_body" to "根据壁纸自适应主题颜色。",
         "appearance_dynamic_unavailable" to "仅支持 Android 12+。",
         "appearance_pure_black_title" to "深色主题（纯黑）",
-        "appearance_pure_black_body" to "使用纯黑深色主题。"
+        "appearance_pure_black_body" to "使用纯黑深色主题。",
+        "photo_google" to "Google Photos",
+        "share_exact" to "应用卡片（完整）",
+        "touch_send" to "触碰发送",
+        "touch_send_anim" to "正在准备近距离发送...",
+        "touch_send_transports" to "可用传输:",
+        "touch_send_hint" to "让两部手机靠近，并在 Android 分享面板中选择近距离分享。"
     )
     return when (language) { AppLanguage.EN -> en3[key] ?: key; AppLanguage.ZH -> zh2b[key] ?: key; else -> pt3[key] ?: key }
 }

@@ -1,5 +1,11 @@
 # Changelog
 
+## Visitas 1.9.9 - 2026-04-12
+
+- Compartilhamento: novo formato `.visitas-card` para enviar o cartao completo entre celulares com o app instalado, incluindo campos, cor, QR e foto embutida.
+- Compartilhamento: novo “Envio toque” com animacao antes de abrir o compartilhamento proximo do Android.
+- Fotos: seletor atualizado para o Photo Picker do Android, permitindo escolher imagens do Google Fotos quando disponivel.
+
 ## Visitas 1.9.8 - 2026-04-09
 
 - UI: pílula inferior com comprimento menor (menos larga) mantendo a altura maior.
