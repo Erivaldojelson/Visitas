@@ -1,5 +1,13 @@
 # Changelog
 
+## Visitas 1.10.1 - 2026-04-13
+
+- Google Wallet: agora o app mostra feedback visível ao salvar a configuração e ao iniciar o envio do cartão.
+- Google Wallet: o picker volta para a tela principal assim que o cartão é escolhido, deixando claro que o fluxo começou.
+- Google Wallet: adicionada camada visual de carregamento enquanto o JWT/link é gerado.
+- Google Wallet: se a abertura nativa falhar, o app cai automaticamente no link externo do Wallet.
+- Release: workflow atualizada para usar o backend público ativo como fallback temporário.
+
 ## Visitas 1.10.0 - 2026-04-13
 
 - Google Wallet: menu de 3 pontos agora inclui “Salvar ao Google Wallet” com seletor de cartão antes do envio.

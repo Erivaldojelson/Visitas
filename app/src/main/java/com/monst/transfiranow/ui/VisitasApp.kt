@@ -347,6 +347,19 @@ fun VisitasApp(
         com.monst.transfiranow.data.AppThemeMode.DARK -> true
         else -> systemDark
     }
+    var hasSeenInitialStatusMessage by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(uiState.statusMessage) {
+        val message = uiState.statusMessage.trim()
+        if (!hasSeenInitialStatusMessage) {
+            hasSeenInitialStatusMessage = true
+            return@LaunchedEffect
+        }
+        if (message.isNotBlank()) {
+            showToast(context, message)
+        }
+    }
+
     TransfiraNowTheme(
         dynamicColor = uiState.dynamicColorEnabled,
         accentColor = themeAccent,
@@ -754,7 +767,10 @@ fun VisitasApp(
                                     padding = padding,
                                     cards = uiState.cards,
                                     t = t,
-                                    onSelect = onSaveToWallet
+                                    onSelect = { card ->
+                                        tab = lastMainTab
+                                        onSaveToWallet(card)
+                                    }
                                 )
                             }
                             }
@@ -772,6 +788,10 @@ fun VisitasApp(
                             )
                         } else {
                             MainScaffold(tab)
+                        }
+
+                        if (uiState.isSavingToWallet) {
+                            WalletSavingOverlay(message = t("wallet_generating"))
                         }
                     }
                     OverlayScreen.DETAILS_SAVED -> {
@@ -1630,6 +1650,36 @@ private fun TouchPhoneCard(offset: Dp) {
                 shape = RoundedCornerShape(11.dp),
                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
             ) {}
+        }
+    }
+}
+
+@Composable
+private fun WalletSavingOverlay(message: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.34f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            tonalElevation = 8.dp,
+            shadowElevation = 8.dp
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 22.dp, vertical = 18.dp),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(26.dp), strokeWidth = 3.dp)
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
         }
     }
 }

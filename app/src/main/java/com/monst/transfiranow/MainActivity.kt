@@ -128,11 +128,23 @@ class MainActivity : FragmentActivity() {
 
     private fun saveCardToGoogleWallet(card: VisitingCard) {
         viewModel.prepareWalletSavePass(card) { issuedPass ->
-            if (viewModel.uiState.value.canUseGoogleWallet) {
+            val openedNativeFlow = runCatching {
+                if (!viewModel.uiState.value.canUseGoogleWallet) {
+                    return@runCatching false
+                }
                 walletClient.savePassesJwt(issuedPass.jwt, this, SAVE_TO_WALLET_REQUEST_CODE)
-            } else {
-                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(issuedPass.url)))
-                viewModel.onWalletSaveResult("Abrindo o link do Google Wallet para concluir o salvamento.")
+                true
+            }.getOrElse { false }
+
+            if (!openedNativeFlow) {
+                runCatching {
+                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(issuedPass.url)))
+                    viewModel.onWalletSaveResult("Abrindo o link do Google Wallet para concluir o salvamento.")
+                }.onFailure { error ->
+                    viewModel.onWalletSaveResult(
+                        error.message ?: "Não foi possível abrir o fluxo do Google Wallet."
+                    )
+                }
             }
         }
     }

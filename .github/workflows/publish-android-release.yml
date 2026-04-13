@@ -9,7 +9,7 @@ on:
       tag:
         description: "Tag to publish (example: v1.0.1)"
         required: true
-        default: "v1.9.9"
+        default: "v1.10.1"
 
 permissions:
   contents: write
@@ -43,7 +43,7 @@ jobs:
 
       - name: Build release APK
         env:
-          CARDS_API_BASE_URL: ${{ vars.CARDS_API_BASE_URL || 'https://11309f5e9c0e92.lhr.life/' }}
+          CARDS_API_BASE_URL: ${{ vars.CARDS_API_BASE_URL || 'https://ce1533ecd1bd0b.lhr.life/' }}
         run: ./gradlew :app:assembleRelease
 
       - name: Rename APK
