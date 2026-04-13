@@ -6,7 +6,7 @@ Na implementação mais recente foi, implemtado o Live update compátivel com a 
 
 ## Versao
 
-- `1.9.9`
+- `1.10.0`
 
 ## O que o app faz
 
@@ -20,9 +20,10 @@ Na implementação mais recente foi, implemtado o Live update compátivel com a 
 - Usa o Photo Picker do Android para escolher fotos, incluindo Google Fotos quando disponivel no aparelho.
 - Tem navegacao inferior em pilula com Home, Salvos e Configuracoes (Criar fica no menu de 3 pontos).
 - Mostra os 10 cartoes mais recentes na Home e todos os cartoes na aba Salvos.
-- Home e Salvos tem menu de 3 pontos com Criar, Partilhar, Editar e Excluir (Modo apresentação na Home).
+- Home e Salvos tem menu de 3 pontos com Criar, Salvar ao Google Wallet, Partilhar, Editar e Excluir (Modo apresentação na Home).
 - Permite trocar o idioma do app para Portugues (Brasil, Portugal e Angola), Ingles e Chines.
-- Gera o payload do passe generico no app e envia esse payload para um backend que assina o JWT.
+- Permite escolher um cartão no menu de 3 pontos e salvar no Google Wallet.
+- Converte o cartão para `GenericClass`/`GenericObject`, cria/atualiza esse passe no backend e depois chama `savePassesJwt`.
 - Mostra as informações dos cartões na Now bar ou no Live Update da samsung.
 - Adptável a todos os formatos de tela incluíndo (Dobráveis e tablets).
 
@@ -49,7 +50,7 @@ Referencia oficial:
 - `app/src/main/java/com/monst/transfiranow/wallet`
   Montagem do payload do Google Wallet e cliente do backend JWT.
 - `backend`
-  Backend minimo para assinar o JWT do Google Wallet.
+  Backend que cria/atualiza passes na Google Wallet API e assina o JWT.
 
 ## Requisitos
 
@@ -75,7 +76,9 @@ No Windows:
 
 O APK atual gerado para distribuicao manual fica em:
 
-- `release/Visitas-v1.9.9-release.apk`
+- `release/Visitas-v1.10.0-release.apk`
+
+Para builds de release no GitHub Actions com backend publico, configure a variavel do repositório `CARDS_API_BASE_URL`.
 
 ## Proximos passos sugeridos
 

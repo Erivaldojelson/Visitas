@@ -23,6 +23,9 @@ backend/node_modules/
 # Backend runtime files
 backend/.env
 backend/data/
+backend/public-backend-url.txt
+backend/runtime-*.log
+backend/runtime-*.pid
 
 # Local research / downloads
 wallet-android-codelab/

@@ -4,6 +4,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
 import jwt from "jsonwebtoken";
+import { google } from "googleapis";
 import QRCode from "qrcode";
 
 const app = express();
@@ -21,6 +22,8 @@ const walletClassSuffix = process.env.GOOGLE_WALLET_CLASS_SUFFIX || "";
 const walletClassId =
   process.env.GOOGLE_WALLET_CLASS_ID ||
   (walletIssuerId && walletClassSuffix ? `${walletIssuerId}.${walletClassSuffix}` : "");
+const walletIssuerName = process.env.GOOGLE_WALLET_ISSUER_NAME || "Visitas";
+const walletScope = "https://www.googleapis.com/auth/wallet_object.issuer";
 
 const cardsDataDir = process.env.CARDS_DATA_DIR || path.join(process.cwd(), "data");
 const cardsFilePath = path.join(cardsDataDir, "cards.json");
@@ -35,21 +38,38 @@ function validateConfig() {
   }
 }
 
-function validateWalletPassConfig() {
+function validateWalletPassConfig(request = {}) {
   validateConfig();
-  const issuer = getWalletIssuerId();
+  const issuer = getWalletIssuerId(request);
   if (!issuer) {
     throw new Error("Configure GOOGLE_WALLET_ISSUER_ID (ou GOOGLE_WALLET_CLASS_ID).");
   }
-  if (!walletClassId) {
+  if (!getWalletClassId(request)) {
     throw new Error("Configure GOOGLE_WALLET_CLASS_ID (ou GOOGLE_WALLET_ISSUER_ID + GOOGLE_WALLET_CLASS_SUFFIX).");
   }
 }
 
-function getWalletIssuerId() {
+function getWalletClassId(request = {}) {
+  const requestClassId = typeof request.classId === "string" ? request.classId.trim() : "";
+  if (requestClassId) return requestClassId;
+
+  const requestIssuerId = typeof request.issuerId === "string" ? request.issuerId.trim() : "";
+  const requestClassSuffix = typeof request.classSuffix === "string" ? request.classSuffix.trim() : "";
+  if (requestIssuerId && requestClassSuffix) {
+    return `${requestIssuerId}.${requestClassSuffix}`;
+  }
+
+  return walletClassId;
+}
+
+function getWalletIssuerId(request = {}) {
+  const requestIssuerId = typeof request.issuerId === "string" ? request.issuerId.trim() : "";
+  if (requestIssuerId) return requestIssuerId;
   if (walletIssuerId) return walletIssuerId;
-  if (!walletClassId) return "";
-  const [issuer] = walletClassId.split(".");
+
+  const resolvedClassId = getWalletClassId(request);
+  if (!resolvedClassId) return "";
+  const [issuer] = resolvedClassId.split(".");
   return issuer || "";
 }
 
@@ -81,6 +101,9 @@ function sanitizeWalletSaveUrlRequest(body) {
     throw new Error("Body inválido.");
   }
 
+  const issuerId = typeof body.issuerId === "string" ? body.issuerId.trim() : "";
+  const classSuffix = typeof body.classSuffix === "string" ? body.classSuffix.trim() : "";
+  const classId = typeof body.classId === "string" ? body.classId.trim() : "";
   const cardId = typeof body.cardId === "string" ? body.cardId.trim() : "";
   const name = typeof body.name === "string" ? body.name.trim() : "";
   const role = typeof body.role === "string" ? body.role.trim() : "";
@@ -100,6 +123,9 @@ function sanitizeWalletSaveUrlRequest(body) {
   if (name.length < 2) throw new Error("Informe um nome válido.");
 
   return {
+    issuerId,
+    classSuffix,
+    classId,
     cardId,
     name,
     role,
@@ -227,7 +253,7 @@ function link(label, url) {
   const trimmed = String(url).trim();
   if (!trimmed) return null;
   return {
-    description: localized(label),
+    description: label,
     uri: trimmed
   };
 }
@@ -253,7 +279,8 @@ function barcode(value) {
 }
 
 function buildGenericObject(request) {
-  const issuer = getWalletIssuerId();
+  const issuer = getWalletIssuerId(request);
+  const classId = getWalletClassId(request);
   const suffixSource = request.cardId ? request.cardId : crypto.randomUUID();
   const objectSuffix = `card_${suffixSource.replace(/-/g, "_")}`;
   const objectId = `${issuer}.${objectSuffix}`;
@@ -268,12 +295,12 @@ function buildGenericObject(request) {
 
   const genericObject = {
     id: objectId,
-    classId: walletClassId,
+    classId,
     state: "ACTIVE",
     hexBackgroundColor: request.passColor,
-    cardTitle: localized(request.name),
+    cardTitle: localized("Visitas"),
     subheader: localized(request.role || "Cartão pessoal"),
-    header: localized(request.phone || request.email || "Contato"),
+    header: localized(request.name),
     textModulesData: [
       textModule("Telefone", request.phone),
       textModule("Email", request.email),
@@ -297,6 +324,69 @@ function buildGenericObject(request) {
   }
 
   return genericObject;
+}
+
+function buildGenericClass(request) {
+  return {
+    id: getWalletClassId(request),
+    issuerName: walletIssuerName,
+    reviewStatus: "UNDER_REVIEW",
+    cardTitle: localized("Visitas")
+  };
+}
+
+function getGoogleApiStatus(error) {
+  return error?.response?.status || error?.status || error?.code || 0;
+}
+
+async function getWalletObjectsClient() {
+  validateConfig();
+  const auth = new google.auth.GoogleAuth({
+    credentials: {
+      client_email: serviceAccountEmail,
+      private_key: privateKey
+    },
+    scopes: [walletScope]
+  });
+
+  return google.walletobjects({
+    version: "v1",
+    auth
+  });
+}
+
+async function ensureGenericClassExists(client, request) {
+  const classId = getWalletClassId(request);
+
+  try {
+    await client.genericclass.get({ resourceId: classId });
+  } catch (error) {
+    if (getGoogleApiStatus(error) !== 404) {
+      throw error;
+    }
+
+    await client.genericclass.insert({
+      requestBody: buildGenericClass(request)
+    });
+  }
+}
+
+async function upsertGenericObject(client, genericObject) {
+  try {
+    await client.genericobject.get({ resourceId: genericObject.id });
+    await client.genericobject.update({
+      resourceId: genericObject.id,
+      requestBody: genericObject
+    });
+  } catch (error) {
+    if (getGoogleApiStatus(error) !== 404) {
+      throw error;
+    }
+
+    await client.genericobject.insert({
+      requestBody: genericObject
+    });
+  }
 }
 
 app.get("/health", (_req, res) => {
@@ -357,11 +447,15 @@ app.post("/wallet/sign", (req, res) => {
   }
 });
 
-app.post("/wallet/save-url", (req, res) => {
+app.post("/wallet/save-url", async (req, res) => {
   try {
-    validateWalletPassConfig();
     const request = sanitizeWalletSaveUrlRequest(req.body);
+    validateWalletPassConfig(request);
     const genericObject = buildGenericObject(request);
+    const client = await getWalletObjectsClient();
+
+    await ensureGenericClassExists(client, request);
+    await upsertGenericObject(client, genericObject);
 
     const claims = {
       iss: serviceAccountEmail,
@@ -377,7 +471,12 @@ app.post("/wallet/save-url", (req, res) => {
     const token = jwt.sign(claims, privateKey, { algorithm: "RS256" });
     const url = `https://pay.google.com/gp/v/save/${token}`;
 
-    res.json({ url, jwt: token });
+    res.json({
+      url,
+      jwt: token,
+      classId: genericObject.classId,
+      objectId: genericObject.id
+    });
   } catch (error) {
     res.status(400).json({
       error: error instanceof Error ? error.message : "Falha ao gerar o link do Google Wallet."

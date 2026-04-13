@@ -84,7 +84,7 @@ object WalletPassBuilder {
     private fun link(label: String, url: String): JSONObject? {
         if (url.isBlank()) return null
         return JSONObject()
-            .put("description", localized(label))
+            .put("description", label)
             .put("uri", url)
     }
 

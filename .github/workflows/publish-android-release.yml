@@ -42,6 +42,8 @@ jobs:
           sdkmanager --install "platforms;android-36" "build-tools;36.1.0"
 
       - name: Build release APK
+        env:
+          CARDS_API_BASE_URL: ${{ vars.CARDS_API_BASE_URL || 'https://11309f5e9c0e92.lhr.life/' }}
         run: ./gradlew :app:assembleRelease
 
       - name: Rename APK

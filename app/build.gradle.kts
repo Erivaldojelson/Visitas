@@ -12,8 +12,8 @@ android {
         applicationId = "com.monst.transfiranow"
         minSdk = 29
         targetSdk = 36
-        versionCode = 34
-        versionName = "1.9.9"
+        versionCode = 35
+        versionName = "1.10.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -21,9 +21,11 @@ android {
         }
     }
 
-    val rawCardsApiBaseUrl = (project.findProperty("CARDS_API_BASE_URL") as String?)
-        ?: System.getenv("CARDS_API_BASE_URL")
-        ?: "http://10.0.2.2:8080/"
+    val rawCardsApiBaseUrl = sequenceOf(
+        project.findProperty("CARDS_API_BASE_URL") as String?,
+        System.getenv("CARDS_API_BASE_URL"),
+        "http://10.0.2.2:8080/"
+    ).first { !it.isNullOrBlank() }!!
 
     val cardsApiBaseUrl = rawCardsApiBaseUrl.trim().let { url ->
         if (url.endsWith("/")) url else "$url/"
@@ -90,6 +92,7 @@ dependencies {
     implementation("androidx.core:core-splashscreen:1.0.1")
     implementation("androidx.biometric:biometric:1.1.0")
     implementation("com.google.android.material:material:1.12.0")
+    implementation("com.google.android.gms:play-services-pay:16.5.0")
     implementation("com.google.zxing:core:3.5.3")
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")

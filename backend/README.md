@@ -1,10 +1,9 @@
-# Visitas Backend (Cards + Wallet)
+# Visitas Backend (Cards + Google Wallet)
 
-Backend para o app `Visitas` com:
+Backend para o app `Visitas` com dois papéis:
 
-- API de cartões (`/cards`) que gera um QR Code (base64 PNG) e retorna o payload usado pelo app Android
-- geração do link do Google Wallet (`/wallet/save-url`) no formato `https://pay.google.com/gp/v/save/{JWT}`
-- (opcional) assinatura bruta do JWT (`/wallet/sign`) caso você queira enviar o payload pronto
+- servir APIs simples de cartão (`/cards`)
+- integrar com a Google Wallet API para criar/atualizar a `GenericClass` e o `GenericObject`, depois assinar o JWT usado pelo app Android
 
 ## Endpoints
 
@@ -14,33 +13,13 @@ Backend para o app `Visitas` com:
 - `POST /wallet/save-url`
 - `POST /wallet/sign`
 
-## Contrato do app (Cards)
+## Fluxo do Google Wallet
 
-O app envia:
-
-```json
-{
-  "name": "Seu Nome",
-  "photo": "https://...",
-  "instagram": "usuario",
-  "whatsapp": "+55...",
-  "website": "https://..."
-}
-```
-
-E recebe:
-
-```json
-{
-  "id": "uuid",
-  "name": "Seu Nome",
-  "photo": "https://...",
-  "instagram": "usuario",
-  "whatsapp": "+55...",
-  "website": "https://...",
-  "qrCode": "data:image/png;base64,..."
-}
-```
+1. O app Android envia os dados do cartão para o backend.
+2. O backend converte esse cartão para o formato `GenericClass`/`GenericObject`.
+3. O backend garante que a classe exista na Google Wallet API e faz upsert do objeto.
+4. O backend assina um JWT `savetowallet`.
+5. O app chama `savePassesJwt(...)` e abre o Google Wallet.
 
 ## Variáveis de ambiente
 
@@ -51,31 +30,62 @@ Use o arquivo `.env.example` como base:
 - `CARDS_DATA_DIR`
 - `GOOGLE_WALLET_ORIGINS`
 - `GOOGLE_WALLET_ISSUER_ID`
-- `GOOGLE_WALLET_CLASS_SUFFIX` (ou `GOOGLE_WALLET_CLASS_ID`)
+- `GOOGLE_WALLET_CLASS_SUFFIX`
+- `GOOGLE_WALLET_CLASS_ID` (opcional)
+- `GOOGLE_WALLET_ISSUER_NAME`
 - `GOOGLE_SERVICE_ACCOUNT_EMAIL`
 - `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY`
-
-## Como configurar
-
-1. Crie o arquivo `backend/.env` a partir de `backend/.env.example`.
-2. Preencha o email da service account do Google Cloud.
-3. Cole a chave privada JSON da service account no campo `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY`, mantendo os `\n`.
-4. Ajuste `GOOGLE_WALLET_ORIGINS` para os dominios permitidos no seu fluxo.
 
 Exemplo:
 
 ```env
 PORT=8080
-CARDS_PUBLIC_BASE_URL=http://localhost:8080
+CARDS_PUBLIC_BASE_URL=https://api.seudominio.com
 CARDS_DATA_DIR=./data
-GOOGLE_WALLET_ORIGINS=http://localhost:3000
+GOOGLE_WALLET_ORIGINS=https://pay.google.com,https://wallet.google.com
 GOOGLE_WALLET_ISSUER_ID=0000000000000000000
 GOOGLE_WALLET_CLASS_SUFFIX=visitas_card
+GOOGLE_WALLET_ISSUER_NAME=Visitas
 GOOGLE_SERVICE_ACCOUNT_EMAIL=wallet-signer@seu-projeto.iam.gserviceaccount.com
 GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIIEv...\n-----END PRIVATE KEY-----\n"
 ```
 
-## Exemplo de execucao
+## Como habilitar a Google Wallet API no Google Cloud
+
+1. Acesse o [Google Cloud Console](https://console.cloud.google.com/) e crie ou selecione um projeto.
+2. Abra `APIs e serviços` > `Biblioteca`.
+3. Pesquise por `Google Wallet API`.
+4. Clique em `Ativar`.
+5. Vá em `IAM e administrador` > `Contas de serviço`.
+6. Crie uma service account para o backend.
+7. Abra a service account e crie uma chave JSON.
+8. Copie `client_email` para `GOOGLE_SERVICE_ACCOUNT_EMAIL`.
+9. Copie `private_key` para `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY`, mantendo as quebras de linha escapadas com `\n`.
+
+## Como habilitar o emissor no Google Wallet
+
+1. Acesse o [Google Pay & Wallet Console](https://pay.google.com/business/console).
+2. Crie ou selecione seu issuer do Google Wallet.
+3. Copie o `Issuer ID` para `GOOGLE_WALLET_ISSUER_ID`.
+4. Defina um identificador fixo para a classe, por exemplo `visitas_card`, em `GOOGLE_WALLET_CLASS_SUFFIX`.
+5. Adicione a service account do Google Cloud como usuária do issuer com permissão para emitir passes.
+6. Para produção, conclua o processo de revisão do issuer/classe no console do Google Wallet.
+
+## Como preparar o Android para chamar o Google Wallet
+
+1. Gere o SHA-1 da chave usada no APK:
+
+```powershell
+.\gradlew.bat signingReport
+```
+
+2. No Google Cloud Console, configure o app Android autorizado com:
+- pacote `com.monst.transfiranow`
+- SHA-1 da assinatura usada no APK de teste ou da assinatura publicada
+
+3. Instale o Google Wallet no celular de teste.
+
+## Instalação local
 
 ```bash
 npm install
@@ -89,61 +99,9 @@ npm install
 npm run dev
 ```
 
-## Exemplo de teste local
+## Teste rápido
 
-### Criar cartão
-
-```powershell
-Invoke-RestMethod `
-  -Method Post `
-  -Uri "http://localhost:8080/cards" `
-  -ContentType "application/json" `
-  -Body (@{
-    name = "Seu Nome"
-    photo = "https://example.com/photo.png"
-  } | ConvertTo-Json)
-```
-
-### Assinar JWT do Wallet
-
-Com o servidor rodando, envie o payload de exemplo:
-
-```json
-{ "jwt": "TOKEN_ASSINADO" }
-```
-
-```powershell
-Invoke-RestMethod `
-  -Method Post `
-  -Uri "http://localhost:8080/wallet/sign" `
-  -ContentType "application/json" `
-  -InFile ".\sample-payload.json"
-```
-
-O app pode enviar o payload inteiro ou um objeto no formato:
-
-```json
-{
-  "payload": {
-    "genericClasses": [],
-    "genericObjects": []
-  }
-}
-```
-
-O backend completa:
-
-- `iss`
-- `aud`
-- `typ`
-- `iat`
-- `origins`
-
-e depois assina via `RS256`.
-
-O arquivo `sample-payload.json` neste diretorio serve como ponto de partida para esse teste.
-
-### Gerar link do Wallet (recomendado)
+Com o servidor rodando:
 
 ```powershell
 Invoke-RestMethod `
@@ -151,6 +109,8 @@ Invoke-RestMethod `
   -Uri "http://localhost:8080/wallet/save-url" `
   -ContentType "application/json" `
   -Body (@{
+    issuerId = "0000000000000000000"
+    classSuffix = "visitas_card"
     cardId = "uuid-do-cartao"
     name = "Seu Nome"
     role = "Seu cargo"
@@ -162,35 +122,31 @@ Invoke-RestMethod `
     note = "Nota opcional"
     passColor = "#1E3A8A"
     qrValue = "https://example.com"
-    photoUrl = "https://example.com/photo.png"
+    walletPhotoUrl = "https://example.com/photo.png"
   } | ConvertTo-Json)
 ```
 
-Resposta:
+Resposta esperada:
 
 ```json
-{ "url": "https://pay.google.com/gp/v/save/..." }
+{
+  "url": "https://pay.google.com/gp/v/save/...",
+  "jwt": "eyJ...",
+  "classId": "0000000000000000000.visitas_card",
+  "objectId": "0000000000000000000.card_uuid_do_cartao"
+}
 ```
 
-## Deploy na Oracle Cloud (Always Free)
+## Observações importantes
 
-Objetivo: subir esse backend em uma VM Always Free (AMD ou ARM) e expor via IP público ou domínio.
+- A imagem do cartão no Google Wallet precisa ser uma URL pública HTTPS.
+- O backend faz upsert do objeto a cada envio, então mudanças no cartão podem ser refletidas em novos salvamentos.
+- Para produção, prefira expor o backend em HTTPS e apontar `CARDS_PUBLIC_BASE_URL` para o domínio real.
+- Se a classe ainda estiver em `UNDER_REVIEW`, o fluxo costuma servir para desenvolvimento e testes, mas a publicação ampla depende da aprovação do Google.
 
-1. Crie uma VM no Oracle Cloud Compute (Always Free) e habilite SSH.
-2. Libere entrada (ingress) para a porta do backend (ex.: `8080`) na Security List/NSG do seu VCN.
-3. Acesse via SSH e instale Docker + Compose.
-4. Clone o repositório na VM e crie `backend/.env` a partir de `.env.example`.
-5. Suba com Docker Compose:
+## Referências oficiais
 
-```bash
-cd backend
-docker compose up -d --build
-```
-
-6. Teste:
-
-```bash
-curl http://localhost:8080/health
-```
-
-Dica: em produção, prefira colocar um reverse proxy (Nginx/Caddy) com TLS e apontar `CARDS_PUBLIC_BASE_URL` para o seu domínio (ex.: `https://api.seudominio.com`).
+- [Google Wallet Android SDK](https://developers.google.com/wallet/generic/android)
+- [Autenticação com service account](https://developers.google.com/wallet/generic/use-cases/auth)
+- [GenericClass REST reference](https://developers.google.com/wallet/reference/rest/v1/genericclass)
+- [GenericObject REST reference](https://developers.google.com/wallet/reference/rest/v1/genericobject)

@@ -13,6 +13,10 @@ import androidx.activity.viewModels
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
+import com.google.android.gms.pay.Pay
+import com.google.android.gms.pay.PayApiAvailabilityStatus
+import com.google.android.gms.pay.PayClient
+import com.monst.transfiranow.data.VisitingCard
 import com.monst.transfiranow.share.CardExchange
 import com.monst.transfiranow.share.MediaImport
 import com.monst.transfiranow.ui.VisitasApp
@@ -23,6 +27,7 @@ import kotlinx.coroutines.withContext
 
 class MainActivity : FragmentActivity() {
     private val viewModel: VisitasViewModel by viewModels()
+    private lateinit var walletClient: PayClient
     private val photoPicker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         uri ?: return@registerForActivityResult
         importPickedPhoto(uri)
@@ -33,10 +38,16 @@ class MainActivity : FragmentActivity() {
         viewModel.updateDraftQrFromImage(contentResolver, uri)
     }
 
+    companion object {
+        private const val SAVE_TO_WALLET_REQUEST_CODE = 1001
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        walletClient = Pay.getClient(this)
+        refreshWalletAvailability()
 
         setContent {
             VisitasApp(
@@ -44,17 +55,35 @@ class MainActivity : FragmentActivity() {
                 onPickPhoto = {
                     photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 },
-                onPickQrCode = { qrPicker.launch(arrayOf("image/*")) }
+                onPickQrCode = { qrPicker.launch(arrayOf("image/*")) },
+                onSaveToWallet = ::saveCardToGoogleWallet
             )
         }
 
         handleIncomingCardIntent(intent)
     }
 
+    override fun onResume() {
+        super.onResume()
+        refreshWalletAvailability()
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         handleIncomingCardIntent(intent)
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != SAVE_TO_WALLET_REQUEST_CODE) return
+
+        val message = when (resultCode) {
+            RESULT_OK -> "Cartão salvo no Google Wallet."
+            RESULT_CANCELED -> "Salvamento no Google Wallet cancelado."
+            else -> "Não foi possível concluir o salvamento no Google Wallet."
+        }
+        viewModel.onWalletSaveResult(message)
     }
 
     private fun importPickedPhoto(uri: Uri) {
@@ -85,6 +114,27 @@ class MainActivity : FragmentActivity() {
         } ?: return
 
         viewModel.importExactCardFromUri(uri)
+    }
+
+    private fun refreshWalletAvailability() {
+        walletClient.getPayApiAvailabilityStatus(PayClient.RequestType.SAVE_PASSES)
+            .addOnSuccessListener { status ->
+                viewModel.setWalletAvailability(status == PayApiAvailabilityStatus.AVAILABLE)
+            }
+            .addOnFailureListener {
+                viewModel.setWalletAvailability(false)
+            }
+    }
+
+    private fun saveCardToGoogleWallet(card: VisitingCard) {
+        viewModel.prepareWalletSavePass(card) { issuedPass ->
+            if (viewModel.uiState.value.canUseGoogleWallet) {
+                walletClient.savePassesJwt(issuedPass.jwt, this, SAVE_TO_WALLET_REQUEST_CODE)
+            } else {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(issuedPass.url)))
+                viewModel.onWalletSaveResult("Abrindo o link do Google Wallet para concluir o salvamento.")
+            }
+        }
     }
 
     private fun Intent.streamUri(): Uri? {

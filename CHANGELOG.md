@@ -1,5 +1,14 @@
 # Changelog
 
+## Visitas 1.10.0 - 2026-04-13
+
+- Google Wallet: menu de 3 pontos agora inclui “Salvar ao Google Wallet” com seletor de cartão antes do envio.
+- Google Wallet: integração Android atualizada para usar `savePassesJwt(...)` com fallback por link quando o SDK não estiver disponível.
+- Configurações: nova seção do Google Wallet para editar `Issuer ID`, `Class suffix` e URL do backend.
+- Backend: integração com a Google Wallet API para criar/atualizar `GenericClass` e `GenericObject` antes de assinar o JWT.
+- Editor: campo para URL pública da foto do Wallet adicionado ao fluxo principal de criação do cartão.
+- Release de teste: pipeline do GitHub configurada para usar o backend público temporário do túnel enquanto não houver host estável.
+
 ## Visitas 1.9.9 - 2026-04-12
 
 - Compartilhamento: novo formato `.visitas-card` para enviar o cartao completo entre celulares com o app instalado, incluindo campos, cor, QR e foto embutida.

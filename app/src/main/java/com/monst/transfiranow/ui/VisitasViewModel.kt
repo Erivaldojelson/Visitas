@@ -19,6 +19,7 @@ import com.monst.transfiranow.share.CardsBackup
 import com.monst.transfiranow.util.VCardParser
 import com.monst.transfiranow.widget.MyCardWidgetProvider
 import com.monst.transfiranow.BuildConfig
+import com.monst.transfiranow.wallet.IssuedWalletPass
 import com.monst.transfiranow.wallet.WalletSaveUrlClient
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.BinaryBitmap
@@ -420,13 +421,23 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun prepareWalletSaveUrl(card: VisitingCard, onReady: (String) -> Unit) {
+    fun prepareWalletSavePass(card: VisitingCard, onReady: (IssuedWalletPass) -> Unit) {
         val state = _uiState.value
         val backendEndpoint = normalizeWalletBackendEndpoint(
             state.walletBackendUrl.ifBlank { BuildConfig.CARDS_API_BASE_URL }
         )
 
         viewModelScope.launch {
+            if (backendEndpoint.isBlank()) {
+                _uiState.update {
+                    it.copy(
+                        isSavingToWallet = false,
+                        statusMessage = message(it.appLanguage, "wallet_missing")
+                    )
+                }
+                return@launch
+            }
+
             _uiState.update {
                 it.copy(
                     isSavingToWallet = true,
@@ -446,17 +457,19 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
                 .put("note", card.note)
                 .put("passColor", card.passColor)
                 .put("qrValue", card.qrValue)
+                .put("issuerId", state.walletIssuerId)
+                .put("classSuffix", state.walletClassSuffix)
                 .put("walletPhotoUrl", card.walletPhotoUrl)
 
-            val result = walletSaveUrlClient.fetchSaveUrl(backendEndpoint, payload)
-            result.onSuccess { url ->
+            val result = walletSaveUrlClient.fetchIssuedPass(backendEndpoint, payload)
+            result.onSuccess { issuedPass ->
                 _uiState.update {
                     it.copy(
                         isSavingToWallet = false,
                         statusMessage = message(it.appLanguage, "wallet_opening")
                     )
                 }
-                onReady(url)
+                onReady(issuedPass)
             }.onFailure { error ->
                 _uiState.update {
                     it.copy(

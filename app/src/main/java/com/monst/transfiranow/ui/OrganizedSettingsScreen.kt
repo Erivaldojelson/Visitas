@@ -50,6 +50,7 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -94,7 +95,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private enum class SettingsPage { HOME, APPEARANCE, LANGUAGE, SECURITY, NOTIFICATIONS, NOW_BAR, BACKUP, ABOUT }
+private enum class SettingsPage { HOME, APPEARANCE, LANGUAGE, SECURITY, NOTIFICATIONS, NOW_BAR, BACKUP, WALLET, ABOUT }
 
 private fun adaptiveSidePadding(maxWidth: Dp, maxContentWidth: Dp, minPadding: Dp = 16.dp): Dp {
     if (maxWidth <= maxContentWidth) return minPadding
@@ -114,6 +115,10 @@ fun OrganizedSettingsScreen(
     themeMode: AppThemeMode,
     dynamicColorEnabled: Boolean,
     pureBlackThemeEnabled: Boolean,
+    walletIssuerId: String,
+    walletClassSuffix: String,
+    walletBackendUrl: String,
+    canUseGoogleWallet: Boolean,
     t: (String) -> String,
     onLanguageSelected: (AppLanguage) -> Unit,
     onAppLockEnabledChange: (Boolean) -> Unit,
@@ -123,6 +128,8 @@ fun OrganizedSettingsScreen(
     onThemeModeChange: (AppThemeMode) -> Unit,
     onDynamicColorEnabledChange: (Boolean) -> Unit,
     onPureBlackThemeEnabledChange: (Boolean) -> Unit,
+    onWalletSettingsChange: (String?, String?, String?) -> Unit,
+    onPersistWalletSettings: () -> Unit,
     onImportBackup: (Uri) -> Unit
 ) {
     val context = LocalContext.current
@@ -187,6 +194,16 @@ fun OrganizedSettingsScreen(
                         subtitle = t("settings_appearance_hint"),
                     ) {
                         page = SettingsPage.APPEARANCE
+                    }
+                }
+
+                item {
+                    SettingsNavRow(
+                        icon = Icons.Rounded.Share,
+                        title = t("wallet"),
+                        subtitle = if (canUseGoogleWallet) t("wallet_on") else t("wallet_off"),
+                    ) {
+                        page = SettingsPage.WALLET
                     }
                 }
 
@@ -443,6 +460,57 @@ fun OrganizedSettingsScreen(
                                 ) {
                                     Text(t("backup_import"))
                                 }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        SettingsPage.WALLET -> BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
+            val side = adaptiveSidePadding(maxWidth, maxContentWidth = 720.dp)
+            LazyColumn(
+                Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(side, 16.dp, side, 120.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                item { SettingsTopBar(title = t("wallet")) { page = SettingsPage.HOME } }
+                item {
+                    ElevatedCard(shape = RoundedCornerShape(28.dp)) {
+                        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text(
+                                if (canUseGoogleWallet) t("wallet_on") else t("wallet_off"),
+                                color = if (canUseGoogleWallet) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            OutlinedTextField(
+                                value = walletIssuerId,
+                                onValueChange = { onWalletSettingsChange(it, null, null) },
+                                label = { Text("Issuer ID") },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true
+                            )
+                            OutlinedTextField(
+                                value = walletClassSuffix,
+                                onValueChange = { onWalletSettingsChange(null, it, null) },
+                                label = { Text("Class suffix") },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true
+                            )
+                            OutlinedTextField(
+                                value = walletBackendUrl,
+                                onValueChange = { onWalletSettingsChange(null, null, it) },
+                                label = { Text(t("backend")) },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true
+                            )
+                            Text(
+                                t("photo_hint"),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            FilledTonalButton(onClick = onPersistWalletSettings) {
+                                Text(t("wallet_save"))
                             }
                         }
                     }

@@ -6,8 +6,13 @@ import java.net.HttpURLConnection
 import java.net.URL
 import org.json.JSONObject
 
+data class IssuedWalletPass(
+    val url: String,
+    val jwt: String
+)
+
 class WalletSaveUrlClient {
-    fun fetchSaveUrl(endpoint: String, payload: JSONObject): Result<String> {
+    fun fetchIssuedPass(endpoint: String, payload: JSONObject): Result<IssuedWalletPass> {
         return runCatching {
             val connection = URL(endpoint).openConnection() as HttpURLConnection
             connection.requestMethod = "POST"
@@ -24,28 +29,37 @@ class WalletSaveUrlClient {
                 if (connection.responseCode in 200..299) {
                     connection.inputStream.reader()
                 } else {
-                    connection.errorStream?.reader() ?: throw IllegalStateException("Falha ao gerar link do Wallet.")
+                    connection.errorStream?.reader() ?: throw IllegalStateException("Falha ao gerar passe do Wallet.")
                 }
             ).use { it.readText() }
 
-            parseUrl(body)
+            parseIssuedPass(body)
         }
     }
 
-    private fun parseUrl(body: String): String {
+    private fun parseIssuedPass(body: String): IssuedWalletPass {
         val trimmed = body.trim()
-        if (!trimmed.startsWith("{")) return trimmed
+        if (!trimmed.startsWith("{")) {
+            val jwt = trimmed.substringAfterLast("/save/", missingDelimiterValue = "")
+            if (jwt.isBlank()) throw IllegalStateException("Resposta do backend inválida para o Google Wallet.")
+            return IssuedWalletPass(url = trimmed, jwt = jwt)
+        }
 
         val json = JSONObject(trimmed)
-        json.optString("url").takeIf { it.isNotBlank() }?.let { return it }
-        json.optString("jwt").takeIf { it.isNotBlank() }?.let { jwt ->
-            return "https://pay.google.com/gp/v/save/$jwt"
+        val url = json.optString("url").trim()
+        val jwt = json.optString("jwt").trim().ifBlank {
+            url.substringAfterLast("/save/", missingDelimiterValue = "")
         }
+
+        if (url.isNotBlank() && jwt.isNotBlank()) {
+            return IssuedWalletPass(url = url, jwt = jwt)
+        }
+
         json.optString("error").takeIf { it.isNotBlank() }?.let { message ->
             throw IllegalStateException(message)
         }
 
-        throw IllegalStateException("Resposta do backend não contém o campo url.")
+        throw IllegalStateException("Resposta do backend não contém url/jwt do Google Wallet.")
     }
 }
 
