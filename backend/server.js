@@ -25,7 +25,8 @@ const walletClassId =
 const walletIssuerName = process.env.GOOGLE_WALLET_ISSUER_NAME || "Visitas";
 const walletScope = "https://www.googleapis.com/auth/wallet_object.issuer";
 
-const cardsDataDir = process.env.CARDS_DATA_DIR || path.join(process.cwd(), "data");
+const defaultCardsDataDir = process.env.VERCEL ? "/tmp/visitas-cards" : path.join(process.cwd(), "data");
+const cardsDataDir = process.env.CARDS_DATA_DIR || defaultCardsDataDir;
 const cardsFilePath = path.join(cardsDataDir, "cards.json");
 const cardsPublicBaseUrl = (process.env.CARDS_PUBLIC_BASE_URL || `http://localhost:${port}`).replace(/\/+$/, "");
 
@@ -484,8 +485,14 @@ app.post("/wallet/save-url", async (req, res) => {
   }
 });
 
-await loadCardsFromDisk();
+const ready = loadCardsFromDisk();
 
-app.listen(port, () => {
-  console.log(`Visitas backend listening on port ${port}`);
-});
+if (!process.env.VERCEL) {
+  await ready;
+
+  app.listen(port, () => {
+    console.log(`Visitas backend listening on port ${port}`);
+  });
+}
+
+export { app, ready };

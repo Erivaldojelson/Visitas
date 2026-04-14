@@ -1,0 +1,12 @@
+backend/.env
+backend/data/
+backend/node_modules/
+backend/runtime-*.log
+backend/runtime-*.pid
+node_modules/
+release/
+.gradle/
+**/build/
+local.properties
+*.jks
+*.keystore

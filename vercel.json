@@ -1,0 +1,22 @@
+{
+  "version": 2,
+  "installCommand": "cd backend && npm ci",
+  "buildCommand": "echo \"No build step required\"",
+  "builds": [
+    {
+      "src": "backend/api/index.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "backend/api/index.js"
+    }
+  ],
+  "functions": {
+    "backend/api/index.js": {
+      "maxDuration": 30
+    }
+  }
+}

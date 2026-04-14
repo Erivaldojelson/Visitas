@@ -80,6 +80,14 @@ O APK atual gerado para distribuicao manual fica em:
 
 Para builds de release no GitHub Actions com backend publico, configure a variavel do repositório `CARDS_API_BASE_URL`.
 
+### Backend no Vercel
+
+O backend do Google Wallet pode ser publicado no Vercel como funcao serverless. A raiz do
+repositorio ja contem `vercel.json`, que direciona as rotas para `backend/api/index.js`.
+Antes de publicar, configure as variaveis de ambiente do projeto Vercel conforme
+`backend/.env.example`. Nao use o Vercel Blob para o endpoint JWT: Blob serve para arquivos,
+enquanto `/wallet/save-url` precisa rodar como API/serverless.
+
 ## Proximos passos sugeridos
 
 - Criar uma build release assinada para distribuicao publica.

@@ -50,6 +50,28 @@ GOOGLE_SERVICE_ACCOUNT_EMAIL=wallet-signer@seu-projeto.iam.gserviceaccount.com
 GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIIEv...\n-----END PRIVATE KEY-----\n"
 ```
 
+## Deploy no Vercel
+
+O backend tambem pode rodar como funcao serverless no Vercel. O arquivo `vercel.json`
+da raiz aponta todo o trafego para `backend/api/index.js`, que exporta o app Express.
+
+Configure estas variaveis no projeto do Vercel antes do deploy:
+
+- `CARDS_PUBLIC_BASE_URL`: URL publica final do backend
+- `CARDS_DATA_DIR`: opcional; no Vercel o padrao e `/tmp/visitas-cards`
+- `GOOGLE_WALLET_ORIGINS`: origem publica permitida
+- `GOOGLE_WALLET_ISSUER_ID`: issuer ID do Google Wallet
+- `GOOGLE_WALLET_CLASS_SUFFIX`: suffix da classe, por exemplo `visitas_card`
+- `GOOGLE_WALLET_ISSUER_NAME`: nome exibido, por exemplo `Visitas`
+- `GOOGLE_SERVICE_ACCOUNT_EMAIL`: email da service account
+- `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY`: chave privada com quebras de linha escapadas como `\n`
+
+Depois do deploy, teste:
+
+```bash
+curl https://seu-projeto.vercel.app/health
+```
+
 ## Como habilitar a Google Wallet API no Google Cloud
 
 1. Acesse o [Google Cloud Console](https://console.cloud.google.com/) e crie ou selecione um projeto.
