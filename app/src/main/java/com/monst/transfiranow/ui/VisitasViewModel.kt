@@ -52,7 +52,7 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
                         cards = persisted.cards,
                         walletIssuerId = persisted.walletIssuerId,
                         walletClassSuffix = persisted.walletClassSuffix,
-                        walletBackendUrl = persisted.walletBackendUrl,
+                        walletBackendUrl = normalizePersistedWalletBackendUrl(persisted.walletBackendUrl),
                         appLanguage = persisted.appLanguage,
                         themeMode = persisted.themeMode,
                         dynamicColorEnabled = persisted.dynamicColorEnabled,
@@ -486,6 +486,15 @@ class VisitasViewModel(application: Application) : AndroidViewModel(application)
         if (trimmed.isBlank()) return trimmed
         if (trimmed.contains("/wallet/save-url")) return trimmed
         return if (trimmed.matches(Regex("^https?://[^/]+$"))) "$trimmed/wallet/save-url" else trimmed
+    }
+
+    private fun normalizePersistedWalletBackendUrl(raw: String): String {
+        val trimmed = raw.trim()
+        if (trimmed.isBlank()) return trimmed
+
+        val lower = trimmed.lowercase()
+        val isTemporaryTunnel = lower.contains(".lhr.life")
+        return if (isTemporaryTunnel) BuildConfig.CARDS_API_BASE_URL.trim() else trimmed
     }
 
     fun onWalletSaveResult(message: String) {

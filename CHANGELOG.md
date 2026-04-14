@@ -1,5 +1,9 @@
 # Changelog
 
+## Visitas 1.10.3 - 2026-04-14
+
+- Google Wallet: URLs temporárias antigas do túnel `*.lhr.life` agora são trocadas automaticamente pelo backend fixo do Vercel.
+
 ## Visitas 1.10.2 - 2026-04-14
 
 - Backend: Google Wallet publicado no Vercel em `https://visitas-murex.vercel.app`.
