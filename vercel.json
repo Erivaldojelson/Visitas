@@ -13,10 +13,5 @@
       "src": "/(.*)",
       "dest": "backend/api/index.js"
     }
-  ],
-  "functions": {
-    "backend/api/index.js": {
-      "maxDuration": 30
-    }
-  }
+  ]
 }

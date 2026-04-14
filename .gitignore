@@ -49,3 +49,4 @@ Desktop.ini
 # Local release artifacts (upload to GitHub Releases instead of committing)
 release/*.apk
 release/*.aab
+.vercel

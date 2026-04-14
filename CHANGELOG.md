@@ -1,5 +1,12 @@
 # Changelog
 
+## Visitas 1.10.2 - 2026-04-14
+
+- Backend: Google Wallet publicado no Vercel em `https://visitas-murex.vercel.app`.
+- Backend: `/health`, `/cards` e `/wallet/save-url` validados no servidor público.
+- Backend: persistência de `/cards` conectada ao Vercel Blob Store `store_3NzMc2i8xq3vySBn`.
+- Release: APK agora usa a URL fixa do Vercel como backend padrão.
+
 ## Visitas 1.10.1 - 2026-04-13
 
 - Google Wallet: agora o app mostra feedback visível ao salvar a configuração e ao iniciar o envio do cartão.

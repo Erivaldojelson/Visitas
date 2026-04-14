@@ -1,12 +1,30 @@
+# Android project and local caches are not needed by the Vercel backend deploy.
+.git/
+.github/
+.gradle/
+.idea/
+.kotlin/
+.tools/
+.android_home/
+.gradle_user_home*/
+.a/
+.g/
+.tmp/
+app/
+gradle/
+release/
+wallet-android-codelab/
+node_modules/
+
+# Backend runtime/local files.
 backend/.env
 backend/data/
 backend/node_modules/
 backend/runtime-*.log
 backend/runtime-*.pid
-node_modules/
-release/
-.gradle/
-**/build/
+
+# Local Android and signing files.
 local.properties
 *.jks
 *.keystore
+**/build/
