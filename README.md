@@ -88,6 +88,9 @@ Antes de publicar, configure as variaveis de ambiente do projeto Vercel conforme
 `backend/.env.example`. Nao use o Vercel Blob para o endpoint JWT: Blob serve para arquivos,
 enquanto `/wallet/save-url` precisa rodar como API/serverless.
 
+O Blob Store `store_3NzMc2i8xq3vySBn` pode ser usado pela API para persistir os cartões
+criados em `/cards` quando o projeto Vercel tiver `BLOB_READ_WRITE_TOKEN` configurado.
+
 ## Proximos passos sugeridos
 
 - Criar uma build release assinada para distribuicao publica.

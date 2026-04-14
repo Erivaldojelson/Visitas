@@ -28,6 +28,9 @@ Use o arquivo `.env.example` como base:
 - `PORT`
 - `CARDS_PUBLIC_BASE_URL`
 - `CARDS_DATA_DIR`
+- `VERCEL_BLOB_STORE_ID` (opcional; para identificar a loja no `/health`)
+- `VERCEL_BLOB_CARDS_PATH` (opcional; padrão `visitas/cards.json`)
+- `BLOB_READ_WRITE_TOKEN` (opcional; quando definido, `/cards` usa Vercel Blob)
 - `GOOGLE_WALLET_ORIGINS`
 - `GOOGLE_WALLET_ISSUER_ID`
 - `GOOGLE_WALLET_CLASS_SUFFIX`
@@ -42,6 +45,9 @@ Exemplo:
 PORT=8080
 CARDS_PUBLIC_BASE_URL=https://api.seudominio.com
 CARDS_DATA_DIR=./data
+VERCEL_BLOB_STORE_ID=store_3NzMc2i8xq3vySBn
+VERCEL_BLOB_CARDS_PATH=visitas/cards.json
+BLOB_READ_WRITE_TOKEN=
 GOOGLE_WALLET_ORIGINS=https://pay.google.com,https://wallet.google.com
 GOOGLE_WALLET_ISSUER_ID=0000000000000000000
 GOOGLE_WALLET_CLASS_SUFFIX=visitas_card
@@ -59,6 +65,9 @@ Configure estas variaveis no projeto do Vercel antes do deploy:
 
 - `CARDS_PUBLIC_BASE_URL`: URL publica final do backend
 - `CARDS_DATA_DIR`: opcional; no Vercel o padrao e `/tmp/visitas-cards`
+- `VERCEL_BLOB_STORE_ID`: `store_3NzMc2i8xq3vySBn`
+- `VERCEL_BLOB_CARDS_PATH`: `visitas/cards.json`
+- `BLOB_READ_WRITE_TOKEN`: token da loja Vercel Blob conectada ao projeto
 - `GOOGLE_WALLET_ORIGINS`: origem publica permitida
 - `GOOGLE_WALLET_ISSUER_ID`: issuer ID do Google Wallet
 - `GOOGLE_WALLET_CLASS_SUFFIX`: suffix da classe, por exemplo `visitas_card`

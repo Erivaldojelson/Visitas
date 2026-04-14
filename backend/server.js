@@ -5,6 +5,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import jwt from "jsonwebtoken";
 import { google } from "googleapis";
+import { get as getBlob, put as putBlob } from "@vercel/blob";
 import QRCode from "qrcode";
 
 const app = express();
@@ -29,6 +30,9 @@ const defaultCardsDataDir = process.env.VERCEL ? "/tmp/visitas-cards" : path.joi
 const cardsDataDir = process.env.CARDS_DATA_DIR || defaultCardsDataDir;
 const cardsFilePath = path.join(cardsDataDir, "cards.json");
 const cardsPublicBaseUrl = (process.env.CARDS_PUBLIC_BASE_URL || `http://localhost:${port}`).replace(/\/+$/, "");
+const vercelBlobStoreId = process.env.VERCEL_BLOB_STORE_ID || "";
+const vercelBlobCardsPath = process.env.VERCEL_BLOB_CARDS_PATH || "visitas/cards.json";
+const useVercelBlob = Boolean(process.env.BLOB_READ_WRITE_TOKEN);
 
 /** @type {Map<string, any>} */
 const cardsById = new Map();
@@ -174,22 +178,76 @@ async function loadCardsFromDisk() {
   await ensureCardsDataDir();
   try {
     const raw = await fs.readFile(cardsFilePath, "utf8");
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return;
-    for (const item of parsed) {
-      if (item && typeof item === "object" && typeof item.id === "string") {
-        cardsById.set(item.id, item);
-      }
-    }
+    hydrateCardsFromJson(raw);
   } catch (error) {
     if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return;
     throw error;
   }
 }
 
-async function saveCardsToDisk() {
-  await ensureCardsDataDir();
+function hydrateCardsFromJson(raw) {
+  const parsed = JSON.parse(raw);
+  if (!Array.isArray(parsed)) return;
+  cardsById.clear();
+  for (const item of parsed) {
+    if (item && typeof item === "object" && typeof item.id === "string") {
+      cardsById.set(item.id, item);
+    }
+  }
+}
+
+function serializeCards() {
+  return JSON.stringify(Array.from(cardsById.values()), null, 2);
+}
+
+async function readWebStreamAsText(stream) {
+  return new Response(stream).text();
+}
+
+function isBlobNotFound(error) {
+  const status = error?.status || error?.statusCode || error?.response?.status;
+  return status === 404 || String(error?.message || "").toLowerCase().includes("not found");
+}
+
+async function loadCardsFromBlob() {
+  try {
+    const result = await getBlob(vercelBlobCardsPath, { access: "private" });
+    if (!result || result.statusCode === 404 || !result.stream) return;
+    if (result.statusCode && result.statusCode !== 200) {
+      throw new Error(`Falha ao ler cartões do Vercel Blob: HTTP ${result.statusCode}.`);
+    }
+
+    hydrateCardsFromJson(await readWebStreamAsText(result.stream));
+  } catch (error) {
+    if (isBlobNotFound(error)) return;
+    throw error;
+  }
+}
+
+async function saveCardsToBlob() {
+  await putBlob(vercelBlobCardsPath, serializeCards(), {
+    access: "private",
+    allowOverwrite: true,
+    contentType: "application/json"
+  });
+}
+
+async function loadCards() {
+  if (useVercelBlob) {
+    await loadCardsFromBlob();
+    return;
+  }
+  await loadCardsFromDisk();
+}
+
+async function saveCards() {
   const payload = JSON.stringify(Array.from(cardsById.values()), null, 2);
+  if (useVercelBlob) {
+    await saveCardsToBlob();
+    return;
+  }
+
+  await ensureCardsDataDir();
   await fs.writeFile(cardsFilePath, payload, "utf8");
 }
 
@@ -394,7 +452,9 @@ app.get("/health", (_req, res) => {
   res.json({
     ok: true,
     service: "visitas-backend",
-    cards: cardsById.size
+    cards: cardsById.size,
+    storage: useVercelBlob ? "vercel_blob" : "disk",
+    blobStoreId: vercelBlobStoreId || undefined
   });
 });
 
@@ -412,7 +472,7 @@ app.post("/cards", async (req, res) => {
     };
 
     cardsById.set(id, card);
-    await saveCardsToDisk();
+    await saveCards();
 
     res.status(201).json(card);
   } catch (error) {
@@ -485,7 +545,7 @@ app.post("/wallet/save-url", async (req, res) => {
   }
 });
 
-const ready = loadCardsFromDisk();
+const ready = loadCards();
 
 if (!process.env.VERCEL) {
   await ready;
